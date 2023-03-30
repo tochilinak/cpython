@@ -6936,7 +6936,10 @@ maybe_call_line_trace(Py_tracefunc func, PyObject *obj,
     }
     /* Always emit an opcode event if we're tracing all opcodes. */
     if (f->f_trace_opcodes && result == 0) {
-        result = call_trace(func, obj, tstate, frame, PyTrace_OPCODE, _PyFrame_StackPeek(frame));
+        PyObject *arg = Py_None;
+        if (frame->stacktop > 0)
+            arg = _PyFrame_StackPeek(frame);
+        result = call_trace(func, obj, tstate, frame, PyTrace_OPCODE, arg);
     }
     return result;
 }
