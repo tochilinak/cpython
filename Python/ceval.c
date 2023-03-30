@@ -23,6 +23,7 @@
 #include "pycore_sysmodule.h"     // _PySys_Audit()
 #include "pycore_tuple.h"         // _PyTuple_ITEMS()
 #include "pycore_emscripten_signal.h"  // _Py_CHECK_EMSCRIPTEN_SIGNALS
+#include "pycore_frame.h"
 
 #include "pycore_dict.h"
 #include "dictobject.h"
@@ -6935,7 +6936,10 @@ maybe_call_line_trace(Py_tracefunc func, PyObject *obj,
     }
     /* Always emit an opcode event if we're tracing all opcodes. */
     if (f->f_trace_opcodes && result == 0) {
-        result = call_trace(func, obj, tstate, frame, PyTrace_OPCODE, Py_None);
+        PyObject *arg = Py_None;
+        if (frame->stacktop > 0)
+            arg = _PyFrame_StackPeek(frame);
+        result = call_trace(func, obj, tstate, frame, PyTrace_OPCODE, arg);
     }
     return result;
 }
