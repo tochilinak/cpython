@@ -23,7 +23,6 @@
 #include "pycore_sysmodule.h"     // _PySys_Audit()
 #include "pycore_tuple.h"         // _PyTuple_ITEMS()
 #include "pycore_emscripten_signal.h"  // _Py_CHECK_EMSCRIPTEN_SIGNALS
-#include "pycore_frame.h"
 
 #include "pycore_dict.h"
 #include "dictobject.h"
@@ -37,7 +36,6 @@
 
 #include <ctype.h>
 #include <stdbool.h>
-#include <pthread.h>
 
 #ifdef Py_DEBUG
    /* For debugging the interpreter: */
