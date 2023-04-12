@@ -445,6 +445,7 @@ OBJECT_OBJS=	\
 		Objects/abstract.o \
 		Objects/accu.o \
 		Objects/boolobject.o \
+		Objects/wrapper.o \
 		Objects/bytes_methods.o \
 		Objects/bytearrayobject.o \
 		Objects/bytesobject.o \
@@ -1479,6 +1480,7 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/abstract.h \
 		$(srcdir)/Include/bltinmodule.h \
 		$(srcdir)/Include/boolobject.h \
+		$(srcdir)/Include/wrapper.h \
 		$(srcdir)/Include/bytearrayobject.h \
 		$(srcdir)/Include/bytesobject.h \
 		$(srcdir)/Include/ceval.h \
