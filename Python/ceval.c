@@ -1498,17 +1498,16 @@ eval_frame_handle_pending(PyThreadState *tstate)
 
 #define TOUCH_STACK(n, locn) \
 do { \
-    if (cframe.use_tracing && PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER) == (PyObject*) frame->f_code && \
-    frame != NULL && frame->f_code != NULL && STACK_LEVEL() >= 0 && STACK_LEVEL() < STACK_SIZE()) { \
-        for (int i = 1; i <= n && i <= STACK_LEVEL(); i++) { \
+    if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE()) { \
+        for (int i = 1; i <= (n) && i <= STACK_LEVEL(); i++) { \
             stack_pointer[-i] = unwrap(stack_pointer[-i]); \
         } \
-        if (locn >= 0 && locn < frame->f_code->co_nlocals) { \
+        if ((locn) >= 0 && (locn) < frame->f_code->co_nlocals) { \
             PyObject *obj = unwrap(GETLOCAL(locn)); \
             if (obj != GETLOCAL(locn)) \
                 SETLOCAL(locn, obj); \
         } \
-        if (locn == -2) { \
+        if ((locn) == -2) { \
             for (int i = 0; i < frame->f_code->co_nlocals; i++) { \
                 PyObject *obj = unwrap(GETLOCAL(i)); \
                 if (obj != GETLOCAL(i)) \
@@ -1525,12 +1524,25 @@ do { \
             if (is_wrapped(stack_pointer[-i])) \
                 break; \
             stack_pointer[-i] = wrap_concrete_object(stack_pointer[-i]); \
+            Py_XINCREF(stack_pointer[-i]);   \
         } \
         /*for (int i = 0; i < frame->f_code->co_nlocals; i++) { \
             PyObject *obj = unwrap(GETLOCAL(i)); \
             if (obj != GETLOCAL(i)) \
                 SETLOCAL(i, obj); \
         } */ \
+    } \
+} while (0)
+
+#define UNWRAP_LOCALS() \
+do { \
+    if (LOCALS()) { \
+        Py_ssize_t pos = 0; \
+        PyObject *key = 0, *value = 0; \
+        while (PyDict_Next(LOCALS(), &pos, &key, &value)) { \
+            if (is_wrapped(value)) \
+                PyDict_SetItem(LOCALS(), key, unwrap(value)); \
+        } \
     } \
 } while (0)
 
@@ -2491,8 +2503,9 @@ handle_eval_breaker:
             goto error;
         }
 
-        TARGET(RETURN_VALUE) {  // ???
-            TOUCH_STACK(0, -1);
+        TARGET(RETURN_VALUE) {  // ??? For now returns unwrapped values
+            TOUCH_STACK(1, -2);
+            UNWRAP_LOCALS();
             PyObject *retval = POP();
             assert(EMPTY());
             _PyFrame_SetStackPointer(frame, stack_pointer);
@@ -4797,8 +4810,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(PRECALL) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg + 2, -1);
+        TARGET(PRECALL) {  // API
+            TOUCH_STACK(0, -1);
             PREDICTED(PRECALL);
             /* Designed to work in tamdem with LOAD_METHOD. */
             /* `meth` is NULL when LOAD_METHOD thinks that it's not
@@ -4844,8 +4857,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(PRECALL_BOUND_METHOD) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg + 1, -1);
+        TARGET(PRECALL_BOUND_METHOD) {  // API
+            TOUCH_STACK(0, -1);
             DEOPT_IF(is_method(stack_pointer, oparg), PRECALL);
             PyObject *function = PEEK(oparg + 1);
             DEOPT_IF(Py_TYPE(function) != &PyMethod_Type, PRECALL);
@@ -4861,8 +4874,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(PRECALL_PYFUNC) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg + 2, -1);
+        TARGET(PRECALL_PYFUNC) {  // API
+            TOUCH_STACK(0, -1);
             int nargs = oparg + is_method(stack_pointer, oparg);
             PyObject *function = PEEK(nargs + 1);
             DEOPT_IF(Py_TYPE(function) != &PyFunction_Type, PRECALL);
@@ -4871,15 +4884,15 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(KW_NAMES) {
+        TARGET(KW_NAMES) {  // ?
             assert(call_shape.kwnames == NULL);
             assert(oparg < PyTuple_GET_SIZE(consts));
             call_shape.kwnames = GETITEM(consts, oparg);
             DISPATCH();
         }
 
-        TARGET(CALL) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg + 2, -1);
+        TARGET(CALL) {  // API
+            TOUCH_STACK(0, -1);
             int is_meth;
         call_function:
             is_meth = is_method(stack_pointer, oparg);
@@ -4943,8 +4956,7 @@ handle_eval_breaker:
 
         TARGET(PRECALL_ADAPTIVE) {
             _PyPrecallCache *cache = (_PyPrecallCache *)next_instr;
-            if (ADAPTIVE_COUNTER_IS_ZERO(cache)) {  // REQUIRES UNWRAPPED
-                TOUCH_STACK(oparg + 2, -1);
+            if (ADAPTIVE_COUNTER_IS_ZERO(cache)) {
                 next_instr--;
                 int is_meth = is_method(stack_pointer, oparg);
                 int nargs = oparg + is_meth;
@@ -4966,8 +4978,7 @@ handle_eval_breaker:
 
         TARGET(CALL_ADAPTIVE) {
             _PyCallCache *cache = (_PyCallCache *)next_instr;
-            if (ADAPTIVE_COUNTER_IS_ZERO(cache)) {  // REQUIRES UNWRAPPED
-                TOUCH_STACK(oparg + 2, -1);
+            if (ADAPTIVE_COUNTER_IS_ZERO(cache)) {
                 next_instr--;
                 int is_meth = is_method(stack_pointer, oparg);
                 int nargs = oparg + is_meth;
@@ -4987,8 +4998,7 @@ handle_eval_breaker:
             }
         }
 
-        TARGET(CALL_PY_EXACT_ARGS) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg + 2, -1);
+        TARGET(CALL_PY_EXACT_ARGS) {
             assert(call_shape.kwnames == NULL);
             DEOPT_IF(tstate->interp->eval_frame, CALL);
             _PyCallCache *cache = (_PyCallCache *)next_instr;
@@ -5022,8 +5032,7 @@ handle_eval_breaker:
             goto start_frame;
         }
 
-        TARGET(CALL_PY_WITH_DEFAULTS) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg + 2, -1);
+        TARGET(CALL_PY_WITH_DEFAULTS) {
             assert(call_shape.kwnames == NULL);
             DEOPT_IF(tstate->interp->eval_frame, CALL);
             _PyCallCache *cache = (_PyCallCache *)next_instr;
