@@ -1500,18 +1500,27 @@ eval_frame_handle_pending(PyThreadState *tstate)
 do { \
     if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE()) { \
         for (int i = 1; i <= (n) && i <= STACK_LEVEL(); i++) { \
+            PyObject *tmp = stack_pointer[-i]; \
             stack_pointer[-i] = unwrap(stack_pointer[-i]); \
+            if (tmp != stack_pointer[-i]) { \
+                Py_XINCREF(stack_pointer[-i]); \
+                Py_DECREF(tmp); \
+            } \
         } \
         if ((locn) >= 0 && (locn) < frame->f_code->co_nlocals) { \
             PyObject *obj = unwrap(GETLOCAL(locn)); \
-            if (obj != GETLOCAL(locn)) \
+            if (obj != GETLOCAL(locn)) { \
+                Py_XINCREF(obj); \
                 SETLOCAL(locn, obj); \
+            } \
         } \
         if ((locn) == -2) { \
             for (int i = 0; i < frame->f_code->co_nlocals; i++) { \
                 PyObject *obj = unwrap(GETLOCAL(i)); \
-                if (obj != GETLOCAL(i)) \
+                if (obj != GETLOCAL(i)) { \
+                    Py_XINCREF(obj); \
                     SETLOCAL(i, obj); \
+                } \
             } \
         } \
     } \
@@ -1519,18 +1528,31 @@ do { \
 
 #define WRAP() \
 do { \
-    if (cframe.use_tracing && PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER) == (PyObject*) frame->f_code) { \
+    PyObject *wrapper_types = PyDict_GetItemString(GLOBALS(), WRAPPER_DICT_HEADER);           \
+    if (wrapper_types != 0 && cframe.use_tracing &&                                           \
+    PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER) == (PyObject*) frame->f_code && frame->stacktop == -1) { \
         for (int i = 1; i <= STACK_LEVEL(); i++) { \
-            if (is_wrapped(stack_pointer[-i])) \
+            PyObject *tmp = stack_pointer[-i]; \
+            if (!tmp) \
+                continue; \
+            if (is_wrapped(tmp)) \
                 break; \
-            stack_pointer[-i] = wrap_concrete_object(stack_pointer[-i]); \
-            Py_XINCREF(stack_pointer[-i]);   \
+            /*if (is_valid_object(tmp)) {*/   \
+                stack_pointer[-i] = wrap_concrete_object(tmp, wrapper_types); \
+                Py_DECREF(tmp); \
+            /*}*/ \
         } \
-        /*for (int i = 0; i < frame->f_code->co_nlocals; i++) { \
-            PyObject *obj = unwrap(GETLOCAL(i)); \
-            if (obj != GETLOCAL(i)) \
-                SETLOCAL(i, obj); \
-        } */ \
+        if (frame->frame_obj && !frame->frame_obj->f_fast_as_locals) { \
+            for (int i = 0; i < frame->f_code->co_nlocalsplus; i++) { \
+                PyObject *tmp = GETLOCAL(i);                                                                       \
+                if (!tmp || is_wrapped(tmp) || PyCell_Check(tmp))                                                  \
+                    continue; \
+                /*if (is_valid_object(tmp)) {*/ \
+                    PyObject *obj = wrap_concrete_object(tmp, wrapper_types); \
+                    SETLOCAL(i, obj); \
+                /*}*/   \
+            } \
+        }\
     } \
 } while (0)
 
@@ -1540,8 +1562,9 @@ do { \
         Py_ssize_t pos = 0; \
         PyObject *key = 0, *value = 0; \
         while (PyDict_Next(LOCALS(), &pos, &key, &value)) { \
-            if (is_wrapped(value)) \
+            if (is_wrapped(value)) { \
                 PyDict_SetItem(LOCALS(), key, unwrap(value)); \
+            } \
         } \
     } \
 } while (0)
@@ -2341,7 +2364,7 @@ handle_eval_breaker:
         }
 
         TARGET(LIST_APPEND) {  // MUST BE UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 1, -1);
             PyObject *v = POP();
             PyObject *list = PEEK(oparg);
             if (_PyList_AppendTakeRef((PyListObject *)list, v) < 0)
@@ -2351,7 +2374,7 @@ handle_eval_breaker:
         }
 
         TARGET(SET_ADD) {  // MUST BE UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 1, -1);
             PyObject *v = POP();
             PyObject *set = PEEK(oparg);
             int err;
@@ -2481,7 +2504,7 @@ handle_eval_breaker:
         }
 
         TARGET(RAISE_VARARGS) {  // MUST BE UNWRAPPED ?
-            TOUCH_STACK(2, -1);
+            TOUCH_STACK(oparg, -1);
             PyObject *cause = NULL, *exc = NULL;
             switch (oparg) {
             case 2:
@@ -3225,7 +3248,7 @@ handle_eval_breaker:
             goto unbound_local_error;
         }
 
-        TARGET(MAKE_CELL) {  // PUSHES UNWRAPPED
+        TARGET(MAKE_CELL) {  // API
             TOUCH_STACK(0, -1);
             // "initial" is probably NULL but not if it's an arg (or set
             // via PyFrame_LocalsToFast() before MAKE_CELL has run).
@@ -3238,8 +3261,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(DELETE_DEREF) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(0, oparg);
+        TARGET(DELETE_DEREF) {  // API
+            TOUCH_STACK(0, -1);
             PyObject *cell = GETLOCAL(oparg);
             PyObject *oldobj = PyCell_GET(cell);
             if (oldobj != NULL) {
@@ -3288,8 +3311,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(LOAD_DEREF) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(0, oparg);
+        TARGET(LOAD_DEREF) {  // API
+            TOUCH_STACK(0, -1);
             PyObject *cell = GETLOCAL(oparg);
             PyObject *value = PyCell_GET(cell);
             if (value == NULL) {
@@ -3301,8 +3324,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(STORE_DEREF) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(0, oparg);
+        TARGET(STORE_DEREF) {  // API
+            TOUCH_STACK(0, -1);
             PyObject *v = POP();
             PyObject *cell = GETLOCAL(oparg);
             PyObject *oldobj = PyCell_GET(cell);
@@ -3380,7 +3403,7 @@ handle_eval_breaker:
         }
 
         TARGET(LIST_EXTEND) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 1, -1);
             PyObject *iterable = POP();
             PyObject *list = PEEK(oparg);
             PyObject *none_val = _PyList_Extend((PyListObject *)list, iterable);
@@ -3402,7 +3425,7 @@ handle_eval_breaker:
         }
 
         TARGET(SET_UPDATE) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 1, -1);
             PyObject *iterable = POP();
             PyObject *set = PEEK(oparg);
             int err = _PySet_Update(set, iterable);
@@ -3534,7 +3557,7 @@ handle_eval_breaker:
         }
 
         TARGET(DICT_UPDATE) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 1, -1);
             PyObject *update = POP();
             PyObject *dict = PEEK(oparg);
             if (PyDict_Update(dict, update) < 0) {
@@ -3551,7 +3574,7 @@ handle_eval_breaker:
         }
 
         TARGET(DICT_MERGE) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 1, -1);
             PyObject *update = POP();
             PyObject *dict = PEEK(oparg);
 
@@ -5572,18 +5595,22 @@ handle_eval_breaker:
             }
 
             if (oparg & 0x08) {
+                TOUCH_STACK(1, -1);
                 assert(PyTuple_CheckExact(TOP()));
                 func->func_closure = POP();
             }
             if (oparg & 0x04) {
+                TOUCH_STACK(1, -1);
                 assert(PyTuple_CheckExact(TOP()));
                 func->func_annotations = POP();
             }
             if (oparg & 0x02) {
+                TOUCH_STACK(1, -1);
                 assert(PyDict_CheckExact(TOP()));
                 func->func_kwdefaults = POP();
             }
             if (oparg & 0x01) {
+                TOUCH_STACK(1, -1);
                 assert(PyTuple_CheckExact(TOP()));
                 func->func_defaults = POP();
             }
