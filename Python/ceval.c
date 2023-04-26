@@ -1499,12 +1499,24 @@ eval_frame_handle_pending(PyThreadState *tstate)
 #define TOUCH_STACK(n, locn) \
 do { \
     if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE()) { \
+        int j = 1; \
+        PyObject *tracked = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER); \
+        while (tracked && tracked != (PyObject*) frame->f_code \
+        && j <= STACK_LEVEL() && is_wrapped(stack_pointer[-j])) { \
+            PyObject *s = stack_pointer[-j]; \
+            stack_pointer[-j] = unwrap(stack_pointer[-j]); \
+            if (s != stack_pointer[-j]) { \
+                Py_XINCREF(stack_pointer[-j]); \
+                Py_DECREF(s); \
+            } \
+            j++; \
+        } \
         for (int i = 1; i <= (n) && i <= STACK_LEVEL(); i++) { \
-            PyObject *tmp = stack_pointer[-i]; \
+            PyObject *s = stack_pointer[-i]; \
             stack_pointer[-i] = unwrap(stack_pointer[-i]); \
-            if (tmp != stack_pointer[-i]) { \
+            if (s != stack_pointer[-i]) { \
                 Py_XINCREF(stack_pointer[-i]); \
-                Py_DECREF(tmp); \
+                Py_DECREF(s); \
             } \
         } \
         if ((locn) >= 0 && (locn) < frame->f_code->co_nlocals) { \
@@ -1532,25 +1544,22 @@ do { \
     if (wrapper_types != 0 && cframe.use_tracing &&                                           \
     PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER) == (PyObject*) frame->f_code && frame->stacktop == -1) { \
         for (int i = 1; i <= STACK_LEVEL(); i++) { \
-            PyObject *tmp = stack_pointer[-i]; \
-            if (!tmp) \
+            PyObject *s = stack_pointer[-i]; \
+            if (!s) \
                 continue; \
-            if (is_wrapped(tmp)) \
+            if (is_wrapped(s)) \
                 break; \
-            /*if (is_valid_object(tmp)) {*/   \
-                stack_pointer[-i] = wrap_concrete_object(tmp, wrapper_types); \
-                Py_DECREF(tmp); \
-            /*}*/ \
+            stack_pointer[-i] = wrap(s, wrapper_types); \
+            Py_DECREF(s); \
         } \
         if (frame->frame_obj && !frame->frame_obj->f_fast_as_locals) { \
-            for (int i = 0; i < frame->f_code->co_nlocalsplus; i++) { \
-                PyObject *tmp = GETLOCAL(i);                                                                       \
-                if (!tmp || is_wrapped(tmp) || PyCell_Check(tmp))                                                  \
+            /* At index 0 is the executed code */   \
+            for (int i = 1; i < frame->f_code->co_nlocalsplus; i++) { \
+                PyObject *s = GETLOCAL(i); \
+                if (!s || is_wrapped(s) || PyCell_Check(s)) \
                     continue; \
-                /*if (is_valid_object(tmp)) {*/ \
-                    PyObject *obj = wrap_concrete_object(tmp, wrapper_types); \
-                    SETLOCAL(i, obj); \
-                /*}*/   \
+                PyObject *obj = wrap(s, wrapper_types); \
+                SETLOCAL(i, obj); \
             } \
         }\
     } \
@@ -2220,8 +2229,9 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(BINARY_SUBSCR) {  // API
-            TOUCH_STACK(0, -1);
+        TARGET(BINARY_SUBSCR) {  // API, but special case for types
+            if (PyType_Check(unwrap(SECOND())))
+                TOUCH_STACK(2, -1);
             PREDICTED(BINARY_SUBSCR);
             PyObject *sub = POP();
             PyObject *container = TOP();
@@ -2235,7 +2245,9 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(BINARY_SUBSCR_ADAPTIVE) {  // API
+        TARGET(BINARY_SUBSCR_ADAPTIVE) {  // API, but special case for types
+            if (PyType_Check(unwrap(SECOND())))
+                TOUCH_STACK(2, -1);
             TOUCH_STACK(0, -1);
             _PyBinarySubscrCache *cache = (_PyBinarySubscrCache *)next_instr;
             if (ADAPTIVE_COUNTER_IS_ZERO(cache)) {
@@ -2684,8 +2696,8 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(SEND) {  // API
-            TOUCH_STACK(0, -1);
+        TARGET(SEND) {  // REQUIRES UNWRAPPED
+            TOUCH_STACK(2, -1);
             assert(frame->is_entry);
             assert(STACK_LEVEL() >= 2);
             PyObject *v = POP();
@@ -2747,8 +2759,9 @@ handle_eval_breaker:
             DISPATCH();
         }
 
-        TARGET(YIELD_VALUE) {  // ???
-            TOUCH_STACK(0, -1);
+        TARGET(YIELD_VALUE) {  // REQUIRES UNWRAPPED
+            UNWRAP_LOCALS();
+            TOUCH_STACK(1, -1);
             assert(frame->is_entry);
             PyObject *retval = POP();
             _PyFrame_GetGenerator(frame)->gi_frame_state = FRAME_SUSPENDED;
@@ -3589,7 +3602,7 @@ handle_eval_breaker:
         }
 
         TARGET(MAP_ADD) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(oparg, -1);
+            TOUCH_STACK(oparg + 2, -1);
             PyObject *value = TOP();
             PyObject *key = SECOND();
             PyObject *map;

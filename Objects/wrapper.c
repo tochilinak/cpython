@@ -11,15 +11,6 @@ typedef struct {
 } Wrapper;
 
 static PyObject *
-get_orig(PyObject *obj) {
-    if (!obj)
-        return NULL;
-    if (is_wrapped(obj))
-        return ((Wrapper *) obj)->concrete;
-    return obj;
-}
-
-static PyObject *
 get_ready_wrapper_types(PyObject *obj) {
     if (!obj || !is_wrapped(obj))
         return 0;
@@ -34,8 +25,42 @@ tp_dealloc(PyObject *op) {
     Py_XDECREF(wrapper->ready_wrapper_types);
     Py_TYPE(op)->tp_free(op);
 }
-
 SLOT(tp_dealloc)
+
+static PyObject *
+tp_getattr(PyObject *self, char *attr) {
+    PyObject *concrete_self = unwrap(self);
+    return wrap(concrete_self->ob_type->tp_getattr(concrete_self, attr), get_ready_wrapper_types(self));
+}
+SLOT(tp_getattr)
+
+static int
+tp_setattr(PyObject *self, char *attr, PyObject *value) {
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_value = unwrap(value);
+    return concrete_self->ob_type->tp_setattr(concrete_self, attr, concrete_value);
+}
+SLOT(tp_setattr)
+
+// better not to wrap: may be special method (like __repr__). This method is used in namedtuple
+static PyObject *
+tp_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_obj = unwrap(obj);
+    PyObject *concrete_type = unwrap(type);
+    PyObject *result = concrete_self->ob_type->tp_descr_get(concrete_self, concrete_obj, concrete_type);
+    return result;
+}
+SLOT(tp_descr_get)
+
+static int
+tp_descr_set(PyObject *self, PyObject *obj, PyObject *type) {
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_obj = unwrap(obj);
+    PyObject *concrete_type = unwrap(type);
+    return concrete_self->ob_type->tp_descr_set(concrete_self, concrete_obj, concrete_type);
+}
+SLOT(tp_descr_set)
 
 static PyObject *
 tp_getattro(PyObject *self, PyObject *other) {
@@ -44,14 +69,14 @@ tp_getattro(PyObject *self, PyObject *other) {
     //printf("calling %s ", "tp_getattro");
     //PyObject_Print(other, stdout, 0);
     //printf("\n");
-    PyObject *concrete_self = get_orig(self);
-    PyObject *concrete_other = get_orig(other);
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_other = unwrap(other);
     if (concrete_self->ob_type->tp_getattro == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_getattro");
         return 0;
     }
-    return wrap_concrete_object(concrete_self->ob_type->tp_getattro(concrete_self, concrete_other),
-                                get_ready_wrapper_types(self));
+    return wrap(concrete_self->ob_type->tp_getattro(concrete_self, concrete_other),
+                get_ready_wrapper_types(self));
 }
 
 SLOT(tp_getattro)
@@ -60,7 +85,7 @@ SLOT(tp_getattro)
 static PyObject *
 tp_repr(PyObject *self) {
     //printf("calling %s on %p\n", "tp_repr", self);
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_repr == 0) {
         PyErr_SetString(PyExc_TypeError, "no func");
         return 0;
@@ -74,7 +99,7 @@ SLOT(tp_repr)
 static PyObject *
 tp_str(PyObject *self) {
     //printf("calling %s on %p\n", "tp_str", self);
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_str == 0) {
         PyErr_SetString(PyExc_TypeError, "no func");
         return 0;
@@ -87,44 +112,38 @@ SLOT(tp_str)
 static PyObject *
 tp_richcompare(PyObject *self, PyObject *other, int op) {
     //printf("calling %s %d on %p\n", "tp_richcompare", op, self);
-    PyObject *concrete_self = get_orig(self);
-    PyObject *concrete_other = get_orig(other);
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_other = unwrap(other);
     if (concrete_self->ob_type->tp_richcompare == 0) {
         PyErr_SetString(PyExc_TypeError, "no richcompare");
         return 0;
     }
-    return wrap_concrete_object(concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op), get_ready_wrapper_types(self));
+    return wrap(concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op),
+                get_ready_wrapper_types(self));
 }
-
 SLOT(tp_richcompare)
 
 static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
-    /*if (o2) {
-        printf("tp_call prep started. o2: %s\n", Py_TYPE(o2)->tp_name);
-    }
-    if (o1) {
-        printf("tp_call prep started. o1: %ld\n", PyTuple_GET_SIZE(o1));
-    }*/
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
     PyObject *concrete_o1 = 0;
     if (o1) {
         concrete_o1 = PyTuple_New(PyTuple_GET_SIZE(o1));
         for (int i = 0; i < PyTuple_GET_SIZE(o1); i++) {
-            //printf("o1 initial type: %s\n", Py_TYPE(PyTuple_GetItem(o1, i))->tp_name);
-            //printf("o1 concrete type: %s\n", Py_TYPE(get_orig(PyTuple_GetItem(o1, i)))->tp_name);
-            PyObject *concrete = get_orig(PyTuple_GetItem(o1, i));
+            PyObject *concrete = unwrap(PyTuple_GetItem(o1, i));
             Py_XINCREF(concrete);
             PyTuple_SetItem(concrete_o1, i, concrete);
         }
     }
+    //printf("calling tp_call %s %ld\n", Py_TYPE(concrete_self)->tp_name, PyTuple_GET_SIZE(o1));
+    //fflush(stdout);
     if (o2) {
         Py_ssize_t pos = 0;
         PyObject *key = 0, *value = 0;
         while (PyDict_Next(o2, &pos, &key, &value)) {
             //printf("key type: %s\n", Py_TYPE(key)->tp_name);
             if (is_wrapped(value)) {
-                PyObject *concrete = get_orig(value);
+                PyObject *concrete = unwrap(value);
                 Py_XINCREF(concrete);
                 PyDict_SetItem(o2, key, concrete);
             }
@@ -135,7 +154,7 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         return 0;
     }
     //printf("tp_call prep ended\n");
-    return wrap_concrete_object(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), get_ready_wrapper_types(self));
+    return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), get_ready_wrapper_types(self));
 }
 
 SLOT(tp_call)
@@ -144,9 +163,9 @@ int
 tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
 {
     //printf("calling %s on %p\n", "tp_setattro", self);
-    PyObject *concrete_self = get_orig(self);
-    PyObject *concrete_attr = get_orig(attr);
-    PyObject *concrete_value = get_orig(value);
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_attr = unwrap(attr);
+    PyObject *concrete_value = unwrap(value);
     if (concrete_self->ob_type->tp_setattro == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_setattro");
         return 0;
@@ -159,37 +178,45 @@ SLOT(tp_setattro)
 
 PyObject *
 tp_iter(PyObject *self) {
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
 
     if (concrete_self->ob_type->tp_iter == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_iter");
         return 0;
     }
 
-    return wrap_concrete_object(concrete_self->ob_type->tp_iter(concrete_self), get_ready_wrapper_types(self));
+    return wrap(concrete_self->ob_type->tp_iter(concrete_self), get_ready_wrapper_types(self));
 }
 
 SLOT(tp_iter)
 
 PyObject *
 tp_iternext(PyObject *self) {
-    PyObject *concrete_self = get_orig(self);
-
+    PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_iternext == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_iternext");
         return 0;
     }
-
-    return wrap_concrete_object(concrete_self->ob_type->tp_iternext(concrete_self), get_ready_wrapper_types(self));
+    return wrap(concrete_self->ob_type->tp_iternext(concrete_self), get_ready_wrapper_types(self));
 }
-
 SLOT(tp_iternext)
+
+Py_hash_t
+tp_hash(PyObject *self) {
+    PyObject *concrete_self = unwrap(self);
+    if (concrete_self->ob_type->tp_hash == 0) {
+        PyErr_SetString(PyExc_TypeError, "no tp_hash");
+        return 0;
+    }
+    return concrete_self->ob_type->tp_hash(concrete_self);
+}
+SLOT(tp_hash)
 
 #define INQUIRY_NUMBER(func)        int \
                                     func(PyObject *self) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
+                                        PyObject *concrete_self = unwrap(self); \
                                         if (concrete_self->ob_type->tp_as_number == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no number"); \
                                             return 0; \
@@ -205,7 +232,7 @@ SLOT(tp_iternext)
                                     func(PyObject *self) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
+                                        PyObject *concrete_self = unwrap(self); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                               PyErr_SetString(PyExc_TypeError, "no as"); \
                                               return 0; \
@@ -214,49 +241,56 @@ SLOT(tp_iternext)
                                              PyErr_SetString(PyExc_TypeError, "no func");\
                                              return 0; \
                                         } \
-                                        return wrap_concrete_object(concrete_self->ob_type->tp_as->func(concrete_self), get_ready_wrapper_types(self)); \
+                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self), get_ready_wrapper_types(self)); \
                                     }
 
 #define BINARY_FUN_AS(func, tp_as)  static PyObject * \
                                     func(PyObject *self, PyObject *other) \
                                     { \
-                                        /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
-                                        PyObject *concrete_other = get_orig(other); \
-                                        if (concrete_self->ob_type->tp_as == 0) { \
-                                              /*PyErr_SetString(PyExc_TypeError, "no number");*/ \
-                                              return Py_NotImplemented; \
+                                        PyObject *concrete_self = unwrap(self); \
+                                        PyObject *concrete_other = unwrap(other); \
+                                        PyObject *result = Py_NotImplemented; \
+                                        binaryfunc fun = 0; \
+                                        if (concrete_self->ob_type->tp_as && concrete_self->ob_type->tp_as->func) \
+                                            fun = concrete_self->ob_type->tp_as->func; \
+                                        for (int i = 0; i <= 1; i++) { \
+                                            if (fun) { \
+                                                result = fun(concrete_self, concrete_other); \
+                                            } \
+                                            if (result != Py_NotImplemented) \
+                                                break; \
+                                            if (concrete_other->ob_type->tp_as && concrete_other->ob_type->tp_as->func) { \
+                                                fun = concrete_other->ob_type->tp_as->func; \
+                                            } \
                                         } \
-                                        if (concrete_self->ob_type->tp_as->func == 0) { \
-                                             /*PyErr_SetString(PyExc_TypeError, "no func");*/ \
-                                             return Py_NotImplemented; \
-                                        } \
-                                        return wrap_concrete_object(concrete_self->ob_type->tp_as->func(concrete_self, concrete_other), get_ready_wrapper_types(self)); \
+                                        return wrap(result, get_ready_wrapper_types(self)); \
                                     }
 
 #define TERNARY_FUN_AS(func, tp_as) static PyObject * \
                                     func(PyObject *self, PyObject *o1, PyObject *o2) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
-                                        PyObject *concrete_o1 = get_orig(o1); \
-                                        PyObject *concrete_o2 = get_orig(o2); \
+                                        PyObject *concrete_self = unwrap(self); \
+                                        PyObject *concrete_o1 = unwrap(o1); \
+                                        PyObject *concrete_o2 = unwrap(o2); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
-                                            /*PyErr_SetString(PyExc_TypeError, "no number");*/ \
-                                            return Py_NotImplemented; \
+                                            Py_RETURN_NOTIMPLEMENTED;          \
+                                            /*PyErr_SetString(PyExc_TypeError, "no tp_as"); \
+                                            return 0;*/ \
                                         } \
                                         if (concrete_self->ob_type->tp_as->func == 0) { \
-                                             /*PyErr_SetString(PyExc_TypeError, "no func");*/ \
-                                             return Py_NotImplemented; \
+                                             Py_RETURN_NOTIMPLEMENTED;         \
+                                             /*PyErr_SetString(PyExc_TypeError, "no tp_as.func"); \
+                                             return 0;*/ \
                                         } \
-                                        return wrap_concrete_object(concrete_self->ob_type->tp_as->func(concrete_self, concrete_o1, concrete_o2), get_ready_wrapper_types(self)); \
+                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self, concrete_o1, concrete_o2), get_ready_wrapper_types(self)); \
                                     }
 
 #define LEN_FUN_AS(func, tp_as)     static Py_ssize_t \
                                     func(PyObject *self) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
+                                        PyObject *concrete_self = unwrap(self); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
                                             return 0; \
@@ -272,7 +306,7 @@ SLOT(tp_iternext)
                                     func(PyObject *self, Py_ssize_t i) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
+                                        PyObject *concrete_self = unwrap(self); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
                                             return 0; \
@@ -281,15 +315,15 @@ SLOT(tp_iternext)
                                              PyErr_SetString(PyExc_TypeError, "no func"); \
                                              return 0; \
                                         } \
-                                        return wrap_concrete_object(concrete_self->ob_type->tp_as->func(concrete_self, i), get_ready_wrapper_types(self)); \
+                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self, i), get_ready_wrapper_types(self)); \
                                     }
 
 #define SIZEOBJARG_AS(func, tp_as)  static int \
                                     func(PyObject *self, Py_ssize_t i, PyObject *other) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
-                                        PyObject *concrete_other = get_orig(other); \
+                                        PyObject *concrete_self = unwrap(self); \
+                                        PyObject *concrete_other = unwrap(other); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
                                             return 0; \
@@ -305,9 +339,9 @@ SLOT(tp_iternext)
                                     func(PyObject *self, PyObject *o1, PyObject *o2) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
-                                        PyObject *concrete_o1 = get_orig(o1); \
-                                        PyObject *concrete_o2 = get_orig(o2); \
+                                        PyObject *concrete_self = unwrap(self); \
+                                        PyObject *concrete_o1 = unwrap(o1); \
+                                        PyObject *concrete_o2 = unwrap(o2); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
                                             return 0; \
@@ -323,8 +357,8 @@ SLOT(tp_iternext)
                                     func(PyObject *self, PyObject *other) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = get_orig(self); \
-                                        PyObject *concrete_other = get_orig(other); \
+                                        PyObject *concrete_self = unwrap(self); \
+                                        PyObject *concrete_other = unwrap(other); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
                                             return 0; \
@@ -348,14 +382,18 @@ BINARY_FUN_AS(nb_divmod, tp_as_number)
 SLOT(nb_divmod)
 TERNARY_FUN_AS(nb_power, tp_as_number)
 SLOT(nb_power)
+
 UNARY_FUN_AS(nb_negative, tp_as_number)
 SLOT(nb_negative)
+
 UNARY_FUN_AS(nb_positive, tp_as_number)
 SLOT(nb_positive)
+
 UNARY_FUN_AS(nb_absolute, tp_as_number)
 SLOT(nb_absolute)
 INQUIRY_NUMBER(nb_bool)
 SLOT(nb_bool)
+
 UNARY_FUN_AS(nb_invert, tp_as_number)
 SLOT(nb_invert)
 BINARY_FUN_AS(nb_lshift, tp_as_number)
@@ -371,7 +409,7 @@ SLOT(nb_or)
 
 // must return int
 static PyObject *nb_int(PyObject *self) {
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_as_number == 0) {
         PyErr_SetString(PyExc_TypeError, "no as");
         return 0;
@@ -387,21 +425,18 @@ SLOT(nb_int)
 // must return float
 static PyObject *
 nb_float(PyObject *self) {
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_as_number == 0) {
-        PyErr_SetString(PyExc_TypeError, "no as");
+        PyErr_SetString(PyExc_TypeError, "no as_number");
         return 0;
     }
     if (concrete_self->ob_type->tp_as_number->nb_float == 0) {
-        PyErr_SetString(PyExc_TypeError, "no func");
+        PyErr_SetString(PyExc_TypeError, "no nb_float");
         return 0;
     }
-    return wrap_concrete_object(concrete_self->ob_type->tp_as_number->nb_float(concrete_self),
-                                get_ready_wrapper_types(self));
+    return concrete_self->ob_type->tp_as_number->nb_float(concrete_self);
 }
-
 SLOT(nb_float)
-
 
 BINARY_FUN_AS(nb_inplace_add, tp_as_number)
 SLOT(nb_inplace_add)
@@ -435,7 +470,7 @@ SLOT(nb_inplace_true_divide)
 // must return integer
 static PyObject *
 nb_index(PyObject *self) {
-    PyObject *concrete_self = get_orig(self);
+    PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_as_number == 0) {
         PyErr_SetString(PyExc_TypeError, "no as_number");
         return 0;
@@ -457,8 +492,10 @@ LEN_FUN_AS(sq_length, tp_as_sequence)
 SLOT(sq_length)
 BINARY_FUN_AS(sq_concat, tp_as_sequence)
 SLOT(sq_concat)
+
 SIZEARG_FUN_AS(sq_repeat, tp_as_sequence)
 SLOT(sq_repeat)
+
 SIZEARG_FUN_AS(sq_item, tp_as_sequence)
 SLOT(sq_item)
 SIZEOBJARG_AS(sq_ass_item, tp_as_sequence)
@@ -467,6 +504,7 @@ OBJOBJ_AS(sq_contains, tp_as_sequence)
 SLOT(sq_contains)
 BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence)
 SLOT(sq_inplace_concat)
+
 SIZEARG_FUN_AS(sq_inplace_repeat, tp_as_sequence)
 SLOT(sq_inplace_repeat)
 
@@ -565,7 +603,11 @@ create_slot_list(PyObject *concrete) {
             COUNT_OR_SET_FROM_METHODS(mp_subscript);
             COUNT_OR_SET_FROM_METHODS(mp_ass_subscript);
         }
+        COUNT_OR_SET(tp_getattr);
+        COUNT_OR_SET(tp_setattr);
+        // as_async, as_buffer TODO?
         COUNT_OR_SET(tp_repr);
+        COUNT_OR_SET(tp_hash);
         COUNT_OR_SET(tp_call);
         COUNT_OR_SET(tp_str);
         COUNT_OR_SET(tp_getattro);
@@ -573,6 +615,8 @@ create_slot_list(PyObject *concrete) {
         COUNT_OR_SET(tp_richcompare);
         COUNT_OR_SET(tp_iter);
         COUNT_OR_SET(tp_iternext);
+        COUNT_OR_SET(tp_descr_get);
+        COUNT_OR_SET(tp_descr_set);
     }
     slots[i++] = Wrapper_tp_dealloc;
     slots[i++] = final_slot;
@@ -581,7 +625,6 @@ create_slot_list(PyObject *concrete) {
 
 PyTypeObject *
 create_new_wrapper_type(PyObject *concrete) {
-    printf("Creating new wrapper type\n");
     PyType_Slot *slots = create_slot_list(concrete);
     PyType_Spec spec = {
             WrapperTypeName,
@@ -591,7 +634,6 @@ create_new_wrapper_type(PyObject *concrete) {
             slots
     };
     PyTypeObject *result = (PyTypeObject*) PyType_FromSpec(&spec);
-    PyType_Ready(result);
     PyMem_Free(slots);
     return result;
 }
@@ -603,17 +645,16 @@ is_wrapped(PyObject *obj) {
     return strcmp(obj->ob_type->tp_name, WrapperTypeName) == 0;
 }
 
-int
-is_valid_object(PyObject *obj) {
-    return obj && obj->ob_type;
-}
-
 PyObject *
-wrap_concrete_object(PyObject *obj, PyObject *ready_wrapper_types) {
+wrap(PyObject *obj, PyObject *ready_wrapper_types) {
     if (!obj)
         return 0;
     if (obj == Py_NotImplemented)
-        return Py_NotImplemented;
+        Py_RETURN_NOTIMPLEMENTED;
+    if (is_wrapped(obj)) {
+        Py_INCREF(obj);
+        return obj;
+    }
     Py_INCREF(obj);
     Py_INCREF(ready_wrapper_types);
     PyTypeObject *wrapper_type = (PyTypeObject *) PyDict_GetItem(ready_wrapper_types, (PyObject *)Py_TYPE(obj));
