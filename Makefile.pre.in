@@ -442,10 +442,10 @@ PYTHON_OBJS=	\
 ##########################################################################
 # Objects
 OBJECT_OBJS=	\
+		Objects/wrapper.o \
 		Objects/abstract.o \
 		Objects/accu.o \
 		Objects/boolobject.o \
-		Objects/wrapper.o \
 		Objects/bytes_methods.o \
 		Objects/bytearrayobject.o \
 		Objects/bytesobject.o \

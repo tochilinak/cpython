@@ -7,7 +7,9 @@
 typedef struct {
     PyObject_HEAD
     PyObject *concrete;
+    PyObject *symbolic;
     PyObject *ready_wrapper_types;
+    PyObject *symbolic_handler;
 } Wrapper;
 
 static PyObject *
@@ -17,20 +19,73 @@ get_ready_wrapper_types(PyObject *obj) {
     return ((Wrapper *) obj)->ready_wrapper_types;
 }
 
+static PyObject *
+get_symbolic_handler(PyObject *obj) {
+    if (!obj || !is_wrapped(obj))
+        return 0;
+    return ((Wrapper *) obj)->symbolic_handler;
+}
+
+PyObject *
+get_symbolic(PyObject *obj) {
+    if (!obj || !is_wrapped(obj))
+        return 0;
+    return ((Wrapper *) obj)->symbolic;
+}
+
+static PyObject *
+get_symbolic_or_none(PyObject *obj) {
+    PyObject *res = get_symbolic(obj);
+    if (!res)
+        return Py_None;
+    return res;
+}
+
 static void
 tp_dealloc(PyObject *op) {
     Wrapper *wrapper = (Wrapper*) op;
     //printf("deallocating %p; type: %p. GIL: %d. type ref: %ld\n", op, Py_TYPE(op), PyGILState_Check(), Py_REFCNT(Py_TYPE(op)));
     Py_XDECREF(wrapper->concrete);
+    Py_XDECREF(wrapper->symbolic);
     Py_XDECREF(wrapper->ready_wrapper_types);
+    Py_XDECREF(wrapper->symbolic_handler);
     Py_TYPE(op)->tp_free(op);
 }
 SLOT(tp_dealloc)
 
+PyObject *
+make_call_with_meta(PyObject *self, int nargs, PyObject **args, PyObject *kwargs) {
+    PyObject *tuple = PyTuple_New(nargs);
+    for (int i = 0; i < nargs; i++) {
+        PyObject *cur = args[i];
+        if (!cur) cur = Py_None;
+        Py_INCREF(cur);
+        PyTuple_SetItem(tuple, i, cur);
+    }
+    PyObject *result = Py_TYPE(self)->tp_call(self, tuple, kwargs);
+    Py_DECREF(tuple);
+    return result;
+}
+
+PyObject *
+make_call(PyObject *self, int nargs, PyObject **args) {
+    return make_call_with_meta(self, nargs, args, 0);
+}
+
 static PyObject *
 tp_getattr(PyObject *self, char *attr) {
     PyObject *concrete_self = unwrap(self);
-    return wrap(concrete_self->ob_type->tp_getattr(concrete_self, attr), get_ready_wrapper_types(self));
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_getattr_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self), Py_None};
+    PyObject *symb_res = make_call(handler, 3, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        return concrete_self->ob_type->tp_getattr(self, attr);
+    } else {
+        return wrap(concrete_self->ob_type->tp_getattr(concrete_self, attr),symb_res,
+                    get_ready_wrapper_types(self), handler);
+    }
 }
 SLOT(tp_getattr)
 
@@ -38,7 +93,16 @@ static int
 tp_setattr(PyObject *self, char *attr, PyObject *value) {
     PyObject *concrete_self = unwrap(self);
     PyObject *concrete_value = unwrap(value);
-    return concrete_self->ob_type->tp_setattr(concrete_self, attr, concrete_value);
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_setattr_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self), Py_None, get_symbolic_or_none(value)};
+    make_call(handler, 4, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        return concrete_self->ob_type->tp_setattr(self, attr, value);
+    } else {
+        return concrete_self->ob_type->tp_setattr(concrete_self, attr, concrete_value);
+    }
 }
 SLOT(tp_setattr)
 
@@ -48,8 +112,16 @@ tp_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
     PyObject *concrete_self = unwrap(self);
     PyObject *concrete_obj = unwrap(obj);
     PyObject *concrete_type = unwrap(type);
-    PyObject *result = concrete_self->ob_type->tp_descr_get(concrete_self, concrete_obj, concrete_type);
-    return result;
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_descr_get_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self), get_symbolic_or_none(obj), get_symbolic_or_none(type)};
+    make_call(handler, 4, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        return concrete_self->ob_type->tp_descr_get(self, obj, type);
+    } else {
+        return concrete_self->ob_type->tp_descr_get(concrete_self, concrete_obj, concrete_type);
+    }
 }
 SLOT(tp_descr_get)
 
@@ -58,7 +130,16 @@ tp_descr_set(PyObject *self, PyObject *obj, PyObject *type) {
     PyObject *concrete_self = unwrap(self);
     PyObject *concrete_obj = unwrap(obj);
     PyObject *concrete_type = unwrap(type);
-    return concrete_self->ob_type->tp_descr_set(concrete_self, concrete_obj, concrete_type);
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_descr_set_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self), get_symbolic_or_none(obj), get_symbolic_or_none(type)};
+    make_call(handler, 4, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        return concrete_self->ob_type->tp_descr_set(self, obj, type);
+    } else {
+        return concrete_self->ob_type->tp_descr_set(concrete_self, concrete_obj, concrete_type);
+    }
 }
 SLOT(tp_descr_set)
 
@@ -70,15 +151,24 @@ tp_getattro(PyObject *self, PyObject *other) {
     //PyObject_Print(other, stdout, 0);
     //printf("\n");
     PyObject *concrete_self = unwrap(self);
-    PyObject *concrete_other = unwrap(other);
     if (concrete_self->ob_type->tp_getattro == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_getattro");
         return 0;
     }
-    return wrap(concrete_self->ob_type->tp_getattro(concrete_self, concrete_other),
-                get_ready_wrapper_types(self));
-}
 
+    PyObject *concrete_other = unwrap(other);
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_getattro_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self), get_symbolic_or_none(other)};
+    PyObject *symb_result = make_call(handler, 3, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        return concrete_self->ob_type->tp_getattro(self, other);
+    } else {
+        return wrap(concrete_self->ob_type->tp_getattro(concrete_self, concrete_other), symb_result,
+                    get_ready_wrapper_types(self), handler);
+    }
+}
 SLOT(tp_getattro)
 
 // must return real string
@@ -87,12 +177,20 @@ tp_repr(PyObject *self) {
     //printf("calling %s on %p\n", "tp_repr", self);
     PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_repr == 0) {
-        PyErr_SetString(PyExc_TypeError, "no func");
+        PyErr_SetString(PyExc_TypeError, "no tp_repr");
         return 0;
     }
-    return concrete_self->ob_type->tp_repr(concrete_self);
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_repr_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self)};
+    make_call(handler, 2, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        // TODO
+    } else {
+        return concrete_self->ob_type->tp_repr(concrete_self);
+    }
 }
-
 SLOT(tp_repr)
 
 // must return real string
@@ -104,9 +202,17 @@ tp_str(PyObject *self) {
         PyErr_SetString(PyExc_TypeError, "no func");
         return 0;
     }
-    return concrete_self->ob_type->tp_str(concrete_self);
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_str_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self)};
+    make_call(handler, 2, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        // TODO
+    } else {
+        return concrete_self->ob_type->tp_str(concrete_self);
+    }
 }
-
 SLOT(tp_str)
 
 static PyObject *
@@ -118,8 +224,17 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
         PyErr_SetString(PyExc_TypeError, "no richcompare");
         return 0;
     }
-    return wrap(concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op),
-                get_ready_wrapper_types(self));
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_richcompare_name);
+    PyObject *args[] = {func_name, PyLong_FromLong(op), get_symbolic_or_none(self), get_symbolic_or_none(other)};
+    PyObject *symb_result = make_call(handler, 4, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        // TODO
+    } else {
+        return wrap(concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op), symb_result,
+                    get_ready_wrapper_types(self), get_symbolic_handler(self));
+    }
 }
 SLOT(tp_richcompare)
 
@@ -154,11 +269,21 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         return 0;
     }
     //printf("tp_call prep ended\n");
-    return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), get_ready_wrapper_types(self));
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_call_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)};
+    PyObject *symb_result = make_call(handler, 4, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        // TODO
+    } else {
+        return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), symb_result,
+                    get_ready_wrapper_types(self), get_symbolic_handler(self));
+    }
 }
-
 SLOT(tp_call)
 
+//TODO
 int
 tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
 {
@@ -173,7 +298,6 @@ tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
 
     return concrete_self->ob_type->tp_setattro(concrete_self, concrete_attr, concrete_value);
 }
-
 SLOT(tp_setattro)
 
 PyObject *
@@ -185,9 +309,18 @@ tp_iter(PyObject *self) {
         return 0;
     }
 
-    return wrap(concrete_self->ob_type->tp_iter(concrete_self), get_ready_wrapper_types(self));
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_iter_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self)};
+    PyObject *symb_result = make_call(handler, 2, args);
+    Py_DECREF(func_name);
+    if (0 /* entering Python method */) {
+        // TODO
+    } else {
+        return wrap(concrete_self->ob_type->tp_iter(concrete_self), symb_result,
+                    get_ready_wrapper_types(self), get_symbolic_handler(self));
+    }
 }
-
 SLOT(tp_iter)
 
 PyObject *
@@ -197,7 +330,13 @@ tp_iternext(PyObject *self) {
         PyErr_SetString(PyExc_TypeError, "no tp_iternext");
         return 0;
     }
-    return wrap(concrete_self->ob_type->tp_iternext(concrete_self), get_ready_wrapper_types(self));
+    PyObject *handler = get_symbolic_handler(self);
+    PyObject *func_name = PyUnicode_FromString(tp_iternext_name);
+    PyObject *args[] = {func_name, get_symbolic_or_none(self)};
+    PyObject *symb_result = make_call(handler, 2, args);
+    Py_DECREF(func_name);
+    return wrap(concrete_self->ob_type->tp_iternext(concrete_self), symb_result,
+                get_ready_wrapper_types(self), get_symbolic_handler(self));
 }
 SLOT(tp_iternext)
 
@@ -241,7 +380,8 @@ SLOT(tp_hash)
                                              PyErr_SetString(PyExc_TypeError, "no func");\
                                              return 0; \
                                         } \
-                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self), get_ready_wrapper_types(self)); \
+                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self), Py_None, \
+                                                    get_ready_wrapper_types(self), get_symbolic_handler(self)); \
                                     }
 
 #define BINARY_FUN_AS(func, tp_as)  static PyObject * \
@@ -263,7 +403,7 @@ SLOT(tp_hash)
                                                 fun = concrete_other->ob_type->tp_as->func; \
                                             } \
                                         } \
-                                        return wrap(result, get_ready_wrapper_types(self)); \
+                                        return wrap(result, Py_None, get_ready_wrapper_types(self), get_symbolic_handler(self)); \
                                     }
 
 #define TERNARY_FUN_AS(func, tp_as) static PyObject * \
@@ -273,17 +413,22 @@ SLOT(tp_hash)
                                         PyObject *concrete_self = unwrap(self); \
                                         PyObject *concrete_o1 = unwrap(o1); \
                                         PyObject *concrete_o2 = unwrap(o2); \
-                                        if (concrete_self->ob_type->tp_as == 0) { \
-                                            Py_RETURN_NOTIMPLEMENTED;          \
-                                            /*PyErr_SetString(PyExc_TypeError, "no tp_as"); \
-                                            return 0;*/ \
+                                        PyObject *result = Py_NotImplemented; \
+                                        ternaryfunc fun = 0; \
+                                        if (concrete_self->ob_type->tp_as && concrete_self->ob_type->tp_as->func) \
+                                            fun = concrete_self->ob_type->tp_as->func; \
+                                        for (int i = 0; i <= 1; i++) { \
+                                            if (fun) { \
+                                                result = fun(concrete_self, concrete_o1, concrete_o2); \
+                                            } \
+                                            if (result != Py_NotImplemented) \
+                                                break; \
+                                            if (concrete_o1->ob_type->tp_as && concrete_o1->ob_type->tp_as->func) { \
+                                                fun = concrete_o1->ob_type->tp_as->func; \
+                                            } \
                                         } \
-                                        if (concrete_self->ob_type->tp_as->func == 0) { \
-                                             Py_RETURN_NOTIMPLEMENTED;         \
-                                             /*PyErr_SetString(PyExc_TypeError, "no tp_as.func"); \
-                                             return 0;*/ \
-                                        } \
-                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self, concrete_o1, concrete_o2), get_ready_wrapper_types(self)); \
+                                        return wrap(result, Py_None, \
+                                                   get_ready_wrapper_types(self), get_symbolic_handler(self)); \
                                     }
 
 #define LEN_FUN_AS(func, tp_as)     static Py_ssize_t \
@@ -315,7 +460,8 @@ SLOT(tp_hash)
                                              PyErr_SetString(PyExc_TypeError, "no func"); \
                                              return 0; \
                                         } \
-                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self, i), get_ready_wrapper_types(self)); \
+                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self, i), Py_None, \
+                                                    get_ready_wrapper_types(self), get_symbolic_handler(self)); \
                                     }
 
 #define SIZEOBJARG_AS(func, tp_as)  static int \
@@ -646,26 +792,38 @@ is_wrapped(PyObject *obj) {
 }
 
 PyObject *
-wrap(PyObject *obj, PyObject *ready_wrapper_types) {
+wrap(PyObject *obj, PyObject *symbolic, PyObject *ready_wrapper_types, PyObject *symbolic_handler) {
     if (!obj)
         return 0;
+    if (!symbolic)
+        symbolic = Py_None;
     if (obj == Py_NotImplemented)
         Py_RETURN_NOTIMPLEMENTED;
     if (is_wrapped(obj)) {
-        Py_INCREF(obj);
+        //Py_INCREF(obj);
         return obj;
     }
     Py_INCREF(obj);
+    Py_INCREF(symbolic);
     Py_INCREF(ready_wrapper_types);
+    Py_INCREF(symbolic_handler);
     PyTypeObject *wrapper_type = (PyTypeObject *) PyDict_GetItem(ready_wrapper_types, (PyObject *)Py_TYPE(obj));
     if (!wrapper_type)
         wrapper_type = create_new_wrapper_type(obj);
+    if (!wrapper_type) {
+        char err_str[200];
+        sprintf(err_str, "Something went wrong in wrapper type creation of object of type %s", Py_TYPE(obj)->tp_name);
+        PyErr_SetString(PyExc_AssertionError, err_str);
+        return 0;
+    }
 
     PyDict_SetItem(ready_wrapper_types, (PyObject *)Py_TYPE(obj), (PyObject *)wrapper_type);
 
     // TODO: update type wrapper
     Wrapper *result = PyObject_New(Wrapper, wrapper_type);
     result->concrete = obj;
+    result->symbolic = symbolic;
+    result->symbolic_handler = symbolic_handler;
     result->ready_wrapper_types = ready_wrapper_types;
     //printf("created %p; type: %p\n", result, Py_TYPE(result));
     return (PyObject *) result;

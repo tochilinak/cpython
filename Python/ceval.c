@@ -1498,7 +1498,7 @@ eval_frame_handle_pending(PyThreadState *tstate)
 
 #define TOUCH_STACK(n, locn) \
 do { \
-    if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE()) { \
+    if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE() && PyDict_CheckExact(GLOBALS()) && PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER)) { \
         int j = 1; \
         PyObject *tracked = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER); \
         while (tracked && tracked != (PyObject*) frame->f_code \
@@ -1539,8 +1539,9 @@ do { \
 } while (0)
 
 #define WRAP() \
-do { \
-    PyObject *wrapper_types = PyDict_GetItemString(GLOBALS(), WRAPPER_DICT_HEADER);           \
+while (PyDict_CheckExact(GLOBALS()) && PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER)) { \
+    PyObject *wrapper_types = PyDict_GetItemString(GLOBALS(), WRAPPER_DICT_HEADER); \
+    PyObject *symbolic_handler = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HANDLER_HEADER); \
     if (wrapper_types != 0 && cframe.use_tracing &&                                           \
     PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER) == (PyObject*) frame->f_code && frame->stacktop == -1) { \
         for (int i = 1; i <= STACK_LEVEL(); i++) { \
@@ -1549,31 +1550,64 @@ do { \
                 continue; \
             if (is_wrapped(s)) \
                 break; \
-            stack_pointer[-i] = wrap(s, wrapper_types); \
+            PyObject *symbolic = Py_None; \
+            if (symbolic_for_stack && i <= n_symbolic_for_stack) { \
+                symbolic = symbolic_for_stack[i - 1]; \
+            } \
+            stack_pointer[-i] = wrap(s, symbolic, wrapper_types, symbolic_handler); \
             Py_DECREF(s); \
         } \
+        if (symbolic_for_stack) \
+            PyMem_RawFree(symbolic_for_stack); \
+        symbolic_for_stack = 0; \
+        n_symbolic_for_stack = 0; \
         if (frame->frame_obj && !frame->frame_obj->f_fast_as_locals) { \
             /* At index 0 is the executed code */   \
             for (int i = 1; i < frame->f_code->co_nlocalsplus; i++) { \
                 PyObject *s = GETLOCAL(i); \
                 if (!s || is_wrapped(s) || PyCell_Check(s)) \
                     continue; \
-                PyObject *obj = wrap(s, wrapper_types); \
+                PyObject *obj = wrap(s, Py_None, wrapper_types, symbolic_handler); \
                 SETLOCAL(i, obj); \
             } \
         }\
     } \
-} while (0)
+    break; \
+}
 
 #define UNWRAP_LOCALS() \
 do { \
-    if (LOCALS()) { \
+    if (LOCALS() && PyDict_CheckExact(LOCALS())) { \
         Py_ssize_t pos = 0; \
         PyObject *key = 0, *value = 0; \
         while (PyDict_Next(LOCALS(), &pos, &key, &value)) { \
             if (is_wrapped(value)) { \
                 PyDict_SetItem(LOCALS(), key, unwrap(value)); \
             } \
+        } \
+    } \
+} while (0)
+
+#define CALL_SYMBOLIC_HANDLER(nargs, args) \
+do { \
+    PyObject *symbolic_handler = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HANDLER_HEADER); \
+    if (cframe.use_tracing && symbolic_handler && PyDict_GetItemString(GLOBALS(), INSIDE_SYMBOLIC_HANDLER_HEADER) != Py_True) { \
+        PyDict_SetItemString(GLOBALS(), INSIDE_SYMBOLIC_HANDLER_HEADER, Py_True); \
+        PyObject *result = make_call(symbolic_handler, nargs, args); \
+        PyDict_DelItemString(GLOBALS(), INSIDE_SYMBOLIC_HANDLER_HEADER); \
+        if (result && result != Py_None) { \
+            if (!PyList_CheckExact(result)) { \
+                 PyErr_SetString(PyExc_AssertionError, "Symbolic handler must return list"); \
+                 goto error; \
+            } \
+            n_symbolic_for_stack = PyList_Size(result); \
+            symbolic_for_stack = PyMem_RawMalloc(n_symbolic_for_stack * sizeof(PyObject*)); \
+            for (int i = 0; i < n_symbolic_for_stack; i++) { \
+                PyObject *elem = PyList_GetItem(result, n_symbolic_for_stack - i - 1);     \
+                Py_INCREF(elem); \
+                symbolic_for_stack[i] = elem; \
+            } \
+            Py_DECREF(result); \
         } \
     } \
 } while (0)
@@ -1775,6 +1809,8 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
     _Py_CODEUNIT *first_instr;
     _Py_CODEUNIT *next_instr;
     PyObject **stack_pointer;
+    PyObject **symbolic_for_stack = 0;
+    int n_symbolic_for_stack = 0;
 
 /* Sets the above local variables from the frame */
 #define SET_LOCALS_FROM_FRAME() \
@@ -1901,6 +1937,10 @@ handle_eval_breaker:
             PyObject *value = GETITEM(consts, oparg);
             Py_INCREF(value);
             PUSH(value);
+            PyObject *func_name = PyUnicode_FromString("LOAD_CONST");
+            PyObject *args[] = {func_name, value};
+            CALL_SYMBOLIC_HANDLER(2, args);
+            Py_DECREF(func_name);
             DISPATCH();
         }
 
@@ -3391,6 +3431,15 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_LIST) {  // REQUIRES UNWRAPPED
+            PyObject *func_name = PyUnicode_FromString("BUILD_LIST");
+            PyObject *args[256];
+            args[0] = func_name;
+            for (int i = 1; i <= oparg; i++) {
+                Py_XINCREF(get_symbolic(stack_pointer[-i]));
+                args[i] = get_symbolic(stack_pointer[-i]);
+            }
+            CALL_SYMBOLIC_HANDLER(oparg + 1, args);
+            Py_DECREF(func_name);
             TOUCH_STACK(oparg, -1);
             PyObject *list =  PyList_New(oparg);
             if (list == NULL)

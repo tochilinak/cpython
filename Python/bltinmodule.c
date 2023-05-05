@@ -12,6 +12,7 @@
 #include "pycore_ceval.h"         // _PyEval_Vector()
 
 #include "clinic/bltinmodule.c.h"
+#include "wrapper.h"
 
 static PyObject*
 update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs)
@@ -2946,6 +2947,19 @@ PyTypeObject PyZip_Type = {
     PyObject_GC_Del,                    /* tp_free */
 };
 
+static PyObject *
+wrap_concrete_object(PyObject *module, PyObject *const *args, Py_ssize_t nargs) {
+    if (!_PyArg_CheckPositional("wrap_concrete_object", nargs, 4, 4)) {
+        return 0;
+    }
+    if (!PyDict_CheckExact(args[2])) {
+        PyErr_SetString(PyExc_TypeError, "Third argument must be a dict");
+        return 0;
+    }
+    return wrap(args[0], args[1], args[2], args[3]);
+}
+
+#define wrap_concrete_object_doc "(concrete object, symbolic object, dict with wrapper types, symbolic handler) -> wrapper"
 
 static PyMethodDef builtin_methods[] = {
     {"__build_class__", _PyCFunction_CAST(builtin___build_class__),
@@ -2993,6 +3007,10 @@ static PyMethodDef builtin_methods[] = {
     BUILTIN_SORTED_METHODDEF
     BUILTIN_SUM_METHODDEF
     {"vars",            builtin_vars,       METH_VARARGS, vars_doc},
+    {"___wrap_concrete_object___ibmviqhlye",
+     _PyCFunction_CAST(wrap_concrete_object),
+     METH_FASTCALL,
+     wrap_concrete_object_doc},
     {NULL,              NULL},
 };
 
