@@ -3436,7 +3436,7 @@ handle_eval_breaker:
             args[0] = func_name;
             for (int i = 1; i <= oparg; i++) {
                 Py_XINCREF(get_symbolic(stack_pointer[-i]));
-                args[i] = get_symbolic(stack_pointer[-i]);
+                args[oparg + 1 - i] = get_symbolic(stack_pointer[-i]);
             }
             CALL_SYMBOLIC_HANDLER(oparg + 1, args);
             Py_DECREF(func_name);
