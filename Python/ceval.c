@@ -1538,12 +1538,24 @@ do { \
     } \
 } while (0)
 
+static SymbolicAdapter *
+get_adapter_if_tracing(PyObject *globals, _PyInterpreterFrame *frame, _PyCFrame *cframe) {
+    if (!globals || !PyDict_CheckExact(globals) || !(cframe->use_tracing))
+        return 0;
+    PyObject *traced_func = PyDict_GetItemString(globals, SYMBOLIC_HEADER);
+    if (!traced_func || traced_func != (PyObject *) frame->f_code) {
+        return 0;
+    }
+    PyObject *result = PyDict_GetItemString(globals, SYMBOLIC_ADAPTER_HEADER);
+    if (!result || strcmp(Py_TYPE(result)->tp_name, SymbolicAdapterTypeName) != 0)
+        return 0;
+    return (SymbolicAdapter *) result;
+}
+
 #define WRAP() \
-while (PyDict_CheckExact(GLOBALS()) && PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER)) { \
-    PyObject *wrapper_types = PyDict_GetItemString(GLOBALS(), WRAPPER_DICT_HEADER); \
-    PyObject *symbolic_handler = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HANDLER_HEADER); \
-    if (wrapper_types != 0 && cframe.use_tracing &&                                           \
-    PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER) == (PyObject*) frame->f_code && frame->stacktop == -1) { \
+do { \
+    SymbolicAdapter *adapter = get_adapter_if_tracing(GLOBALS(), frame, &cframe); \
+    if (adapter != 0 && frame->stacktop == -1) { \
         for (int i = 1; i <= STACK_LEVEL(); i++) { \
             PyObject *s = stack_pointer[-i]; \
             if (!s) \
@@ -1554,7 +1566,7 @@ while (PyDict_CheckExact(GLOBALS()) && PyDict_GetItemString(GLOBALS(), SYMBOLIC_
             if (symbolic_for_stack && i <= n_symbolic_for_stack) { \
                 symbolic = symbolic_for_stack[i - 1]; \
             } \
-            stack_pointer[-i] = wrap(s, symbolic, wrapper_types, symbolic_handler); \
+            stack_pointer[-i] = wrap(s, symbolic, adapter); \
             Py_DECREF(s); \
         } \
         if (symbolic_for_stack) \
@@ -1567,13 +1579,12 @@ while (PyDict_CheckExact(GLOBALS()) && PyDict_GetItemString(GLOBALS(), SYMBOLIC_
                 PyObject *s = GETLOCAL(i); \
                 if (!s || is_wrapped(s) || PyCell_Check(s)) \
                     continue; \
-                PyObject *obj = wrap(s, Py_None, wrapper_types, symbolic_handler); \
+                PyObject *obj = wrap(s, Py_None, adapter); \
                 SETLOCAL(i, obj); \
             } \
         }\
     } \
-    break; \
-}
+} while (0)
 
 #define UNWRAP_LOCALS() \
 do { \
@@ -1590,11 +1601,9 @@ do { \
 
 #define CALL_SYMBOLIC_HANDLER(nargs, args) \
 do { \
-    PyObject *symbolic_handler = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HANDLER_HEADER); \
-    if (cframe.use_tracing && symbolic_handler && PyDict_GetItemString(GLOBALS(), INSIDE_SYMBOLIC_HANDLER_HEADER) != Py_True) { \
-        PyDict_SetItemString(GLOBALS(), INSIDE_SYMBOLIC_HANDLER_HEADER, Py_True); \
-        PyObject *result = make_call(symbolic_handler, nargs, args); \
-        PyDict_DelItemString(GLOBALS(), INSIDE_SYMBOLIC_HANDLER_HEADER); \
+    SymbolicAdapter *adapter = get_adapter_if_tracing(GLOBALS(), frame, &cframe); \
+    if (adapter) { \
+        PyObject *result = make_call_symbolic_handler(adapter, nargs, args); \
         if (result && result != Py_None) { \
             if (!PyList_CheckExact(result)) { \
                  PyErr_SetString(PyExc_AssertionError, "Symbolic handler must return list"); \

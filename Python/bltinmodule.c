@@ -13,6 +13,7 @@
 
 #include "clinic/bltinmodule.c.h"
 #include "wrapper.h"
+#include "symbolicadapter.h"
 
 static PyObject*
 update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs)
@@ -2949,17 +2950,29 @@ PyTypeObject PyZip_Type = {
 
 static PyObject *
 wrap_concrete_object(PyObject *module, PyObject *const *args, Py_ssize_t nargs) {
-    if (!_PyArg_CheckPositional("wrap_concrete_object", nargs, 4, 4)) {
+    if (!_PyArg_CheckPositional("wrap_concrete_object", nargs, 3, 3)) {
         return 0;
     }
-    if (!PyDict_CheckExact(args[2])) {
-        PyErr_SetString(PyExc_TypeError, "Third argument must be a dict");
+    if (strcmp(Py_TYPE(args[2])->tp_name, SymbolicAdapterTypeName) != 0) {
+        PyErr_SetString(PyExc_TypeError, "Third argument must be a symbolic adapter");
         return 0;
     }
-    return wrap(args[0], args[1], args[2], args[3]);
+    return wrap(args[0], args[1], (SymbolicAdapter *) args[2]);
 }
 
-#define wrap_concrete_object_doc "(concrete object, symbolic object, dict with wrapper types, symbolic handler) -> wrapper"
+#define wrap_concrete_object_doc "(concrete object, symbolic object, symbolic adapter) -> wrapper"
+
+static PyObject *
+create_symbolic_adapter(PyObject *module, PyObject *const *args, Py_ssize_t nargs) {
+    if (!_PyArg_CheckPositional("create_symbolic_adapter", nargs, 1, 1)) {
+        return 0;
+    }
+    if (!Py_TYPE(args[0])->tp_call) {
+        PyErr_SetString(PyExc_TypeError, "Argument must be callable");
+        return 0;
+    }
+    return (PyObject *) create_new_adapter_obj(args[0]);
+}
 
 static PyMethodDef builtin_methods[] = {
     {"__build_class__", _PyCFunction_CAST(builtin___build_class__),
@@ -3011,6 +3024,10 @@ static PyMethodDef builtin_methods[] = {
      _PyCFunction_CAST(wrap_concrete_object),
      METH_FASTCALL,
      wrap_concrete_object_doc},
+    {"___create_symbolic_adapter___ibmviqhlye",
+     _PyCFunction_CAST(create_symbolic_adapter),
+     METH_FASTCALL,
+     ""},
     {NULL,              NULL},
 };
 

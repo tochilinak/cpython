@@ -1,15 +1,14 @@
 
 #ifndef CPYTHON_WRAPPER_H
-#define CPYTHON_WRAPPER_H
 
 #include "Python.h"
+#include "symbolicadapter.h"
+#define CPYTHON_WRAPPER_H
 
 #define WrapperTypeName "ibmviqhlye.___wrapper___ibmviqhlye"
 #define SYMBOLIC_HEADER "___symbolic___ibmviqhlye"
 #define CONCRETE_HEADER "___concrete___ibmviqhlye"
-#define WRAPPER_DICT_HEADER "___wrapper_holder___ibmviqhlye"
-#define SYMBOLIC_HANDLER_HEADER "___handler___ibmviqhlye"
-#define INSIDE_SYMBOLIC_HANDLER_HEADER "___inside_handler___ibmviqhlye"
+#define SYMBOLIC_ADAPTER_HEADER "___adapter___ibmviqhlye"
 
 #define tp_getattr_name "GETATTR"
 #define tp_setattr_name "SETATTR"
@@ -24,12 +23,11 @@
 #define tp_iter_name "ITER"
 #define tp_iternext_name "ITERNEXT"
 
-PyObject *wrap(PyObject *obj, PyObject *symbolic, PyObject *ready_wrapper_types, PyObject *symbolic_handler);
+PyObject *wrap(PyObject *obj, PyObject *symbolic, SymbolicAdapter *adapter);
 PyObject *unwrap(PyObject *obj);
 int is_wrapped(PyObject *obj);
 PyObject *get_symbolic(PyObject *obj);
 
-PyObject *make_call(PyObject *self, int nargs, PyObject **args);
-PyObject *make_call_with_meta(PyObject *self, int nargs, PyObject **args, PyObject *kwargs);
+// PyObject *default_symbolic_handler(Py_ssize_t n, PyObject *const *args, PyObject *callable);
 
 #endif //CPYTHON_WRAPPER_H
