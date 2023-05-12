@@ -6,8 +6,6 @@
 static void
 adapter_dealloc(PyObject *op) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) op;
-    if (adapter->handler_obj)
-        Py_XDECREF(adapter->handler_obj);
     Py_TYPE(op)->tp_free(op);
 }
 
@@ -26,9 +24,19 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
     return 0;
 }
 
-
 PyObject *
-SymbolicAdapter_run(PyObject *self, PyObject *function, PyObject *wrappers) {
+SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args) {
+    SymbolicAdapter *adapter = (SymbolicAdapter *) self;
+    PyObject *wrappers = PyTuple_New(n);
+    for (int i = 0; i < n; i++) {
+        PyObject *cur = args[i];
+        if (!PyTuple_CheckExact(cur) || PyTuple_GET_SIZE(cur) != 2) {
+            PyErr_SetString(PyExc_TypeError, "all arguments must be pairs (concrete, symbolic)");
+            return 0;
+        }
+        PyTuple_SET_ITEM(wrappers, i, wrap(PyTuple_GetItem(cur, 0), PyTuple_GetItem(cur, 1), adapter));
+    }
+
     PyGILState_STATE gil = PyGILState_Ensure();
     PyEval_SetTrace(trace_function, self);
     PyGILState_Release(gil);
@@ -50,23 +58,14 @@ adapter_run(PyObject *self, PyObject *args) {
         PyErr_SetString(PyExc_TypeError, "Bad args");
         return 0;
     }
-    SymbolicAdapter *adapter = (SymbolicAdapter *) self;
     PyObject *function = PyTuple_GetItem(args, 0);
     if (Py_TYPE(function) != &PyFunction_Type) {
         PyErr_SetString(PyExc_TypeError, "First argument must be Python function");
         return 0;
     }
     Py_ssize_t n = PyTuple_GET_SIZE(args) - 1;
-    PyObject *wrappers = PyTuple_New(n);
-    for (int i = 0; i < n; i++) {
-        PyObject *cur = PyTuple_GetItem(args, i + 1);
-        if (!PyTuple_CheckExact(cur) || PyTuple_GET_SIZE(cur) != 2) {
-            PyErr_SetString(PyExc_TypeError, "all arguments (except first) must be pairs (concrete, symbolic)");
-            return 0;
-        }
-        PyTuple_SET_ITEM(wrappers, i, wrap(PyTuple_GetItem(cur, 0), PyTuple_GetItem(cur, 1), adapter));
-    }
-    return SymbolicAdapter_run(self, function, wrappers);
+    PyTupleObject *args_as_tuple = (PyTupleObject *) args;
+    return SymbolicAdapter_run(self, function, n, args_as_tuple->ob_item + 1);
 }
 
 static PyMethodDef adapter_methods[] = {
@@ -117,26 +116,25 @@ PyTypeObject SymbolicAdapter_Type = {
 };
 
 static PyObject *
-default_symbolic_handler(Py_ssize_t n, PyObject *const *args, PyObject *callable) {
-    return make_call(callable, n, args);
+default_symbolic_handler(Py_ssize_t n, PyObject *const *args, void *callable) {
+    return make_call((PyObject *) callable, n, args);
 }
 
 static SymbolicAdapter *
-create_new_adapter_(symbolic_handler_callable handler, PyObject *ready_wrapper_types, PyObject *handler_param) {
+create_new_adapter_(symbolic_handler_callable handler, PyObject *ready_wrapper_types, void *handler_param) {
     SymbolicAdapter *result = PyObject_New(SymbolicAdapter, &SymbolicAdapter_Type);
     Py_INCREF(ready_wrapper_types);
-    Py_XINCREF(handler_param);
     result->handler = handler;
-    result->handler_obj = handler_param;
+    result->handler_param = handler_param;
     result->ready_wrapper_types = ready_wrapper_types;
     result->inside_handler = 0;
     return result;
 }
 
 SymbolicAdapter *
-create_new_adapter(symbolic_handler_callable handler) {
+create_new_adapter(symbolic_handler_callable handler, void *param) {
     PyObject *ready_wrapper_types = PyDict_New();
-    return create_new_adapter_(handler, ready_wrapper_types, 0);
+    return create_new_adapter_(handler, ready_wrapper_types, param);
 }
 
 SymbolicAdapter *
@@ -167,7 +165,7 @@ make_call(PyObject *self, Py_ssize_t nargs, PyObject *const *args) {
 PyObject *
 make_call_symbolic_handler(SymbolicAdapter *adapter, Py_ssize_t nargs, PyObject *const *args) {
     adapter->inside_handler = 1;
-    PyObject *result = adapter->handler(nargs, args, adapter->handler_obj);
+    PyObject *result = adapter->handler(nargs, args, adapter->handler_param);
     adapter->inside_handler = 0;
     return result;
 }
