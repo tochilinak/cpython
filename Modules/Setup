@@ -179,7 +179,6 @@ PYTHONPATH=$(COREPYTHONPATH)
 #_multibytecodec cjkcodecs/multibytecodec.c
 #unicodedata unicodedata.c
 
-*disabled*
 # Modules with some UNIX dependencies
 
 _posixsubprocess _posixsubprocess.c
@@ -192,6 +191,7 @@ spwd spwdmodule.c
 syslog syslogmodule.c
 termios termios.c
 
+*disabled*
 # Modules with UNIX dependencies that require external libraries
 
 _crypt _cryptmodule.c -lcrypt
