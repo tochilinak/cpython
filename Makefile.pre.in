@@ -442,6 +442,8 @@ PYTHON_OBJS=	\
 ##########################################################################
 # Objects
 OBJECT_OBJS=	\
+		Objects/wrapper.o \
+		Objects/symbolicadapter.o \
 		Objects/abstract.o \
 		Objects/accu.o \
 		Objects/boolobject.o \
@@ -1479,6 +1481,8 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/abstract.h \
 		$(srcdir)/Include/bltinmodule.h \
 		$(srcdir)/Include/boolobject.h \
+		$(srcdir)/Include/wrapper.h \
+		$(srcdir)/Include/symbolicadapter.h \
 		$(srcdir)/Include/bytearrayobject.h \
 		$(srcdir)/Include/bytesobject.h \
 		$(srcdir)/Include/ceval.h \
