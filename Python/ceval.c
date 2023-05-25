@@ -1496,9 +1496,19 @@ eval_frame_handle_pending(PyThreadState *tstate)
 #define BUILTINS() frame->f_builtins
 #define LOCALS() frame->f_locals
 
+#define symbolic_tracing_enabled \
+    (cframe.use_tracing && \
+    SymbolicAdapter_CheckExact(GETITEM(consts, PyTuple_GET_SIZE(consts) - 1)) && \
+    !((SymbolicAdapter *) GETITEM(consts, PyTuple_GET_SIZE(consts) - 1))->inside_handler)
+
+#define set_adapter_if_symbolic_tracing_enabled \
+    SymbolicAdapter *adapter = 0; \
+    if (symbolic_tracing_enabled) adapter = (SymbolicAdapter *) GETITEM(consts, PyTuple_GET_SIZE(consts) - 1);
+
+
 #define TOUCH_STACK(n, locn) \
 do { \
-    if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE() && PyDict_CheckExact(GLOBALS()) && PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER)) { \
+    if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE() && symbolic_tracing_enabled) { \
         int j = 1; \
         PyObject *tracked = PyDict_GetItemString(GLOBALS(), SYMBOLIC_HEADER); \
         while (tracked && tracked != (PyObject*) frame->f_code \
@@ -1538,23 +1548,9 @@ do { \
     } \
 } while (0)
 
-static SymbolicAdapter *
-get_adapter_if_tracing(PyObject *globals, _PyInterpreterFrame *frame, _PyCFrame *cframe) {
-    if (!globals || !PyDict_CheckExact(globals) || !(cframe->use_tracing))
-        return 0;
-    PyObject *traced_func = PyDict_GetItemString(globals, SYMBOLIC_HEADER);
-    if (!traced_func || traced_func != (PyObject *) frame->f_code) {
-        return 0;
-    }
-    PyObject *result = PyDict_GetItemString(globals, SYMBOLIC_ADAPTER_HEADER);
-    if (!result || strcmp(Py_TYPE(result)->tp_name, SymbolicAdapterTypeName) != 0)
-        return 0;
-    return (SymbolicAdapter *) result;
-}
-
 #define WRAP() \
 do { \
-    SymbolicAdapter *adapter = get_adapter_if_tracing(GLOBALS(), frame, &cframe); \
+    set_adapter_if_symbolic_tracing_enabled \
     if (adapter != 0 && frame->stacktop == -1) { \
         for (int i = 1; i <= STACK_LEVEL(); i++) { \
             PyObject *s = stack_pointer[-i]; \
@@ -1599,11 +1595,11 @@ do { \
     } \
 } while (0)
 
-#define CALL_SYMBOLIC_HANDLER(nargs, args) \
+#define CALL_SYMBOLIC_HANDLER(event_type, event_id, nargs, args) \
 do { \
-    SymbolicAdapter *adapter = get_adapter_if_tracing(GLOBALS(), frame, &cframe); \
+    set_adapter_if_symbolic_tracing_enabled \
     if (adapter) { \
-        PyObject *result = make_call_symbolic_handler(adapter, nargs, args); \
+        PyObject *result = make_call_symbolic_handler(adapter, event_type, event_id, nargs, args); \
         if (result && result != Py_None) { \
             if (!PyList_CheckExact(result)) { \
                  PyErr_SetString(PyExc_AssertionError, "Symbolic handler must return list"); \
@@ -1946,10 +1942,8 @@ handle_eval_breaker:
             PyObject *value = GETITEM(consts, oparg);
             Py_INCREF(value);
             PUSH(value);
-            PyObject *func_name = PyUnicode_FromString("LOAD_CONST");
-            PyObject *args[] = {func_name, value};
-            CALL_SYMBOLIC_HANDLER(2, args);
-            Py_DECREF(func_name);
+            PyObject *args[] = {value};
+            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_STACK, SYM_EVENT_ID_CONST, 1, args);
             DISPATCH();
         }
 
@@ -3440,15 +3434,12 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_LIST) {  // REQUIRES UNWRAPPED
-            PyObject *func_name = PyUnicode_FromString("BUILD_LIST");
-            PyObject *args[256];
-            args[0] = func_name;
+            PyObject *args[256];  // TODO: check
             for (int i = 1; i <= oparg; i++) {
                 Py_XINCREF(get_symbolic(stack_pointer[-i]));
-                args[oparg + 1 - i] = get_symbolic(stack_pointer[-i]);
+                args[oparg - i] = get_symbolic(stack_pointer[-i]);
             }
-            CALL_SYMBOLIC_HANDLER(oparg + 1, args);
-            Py_DECREF(func_name);
+            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_STACK, SYM_EVENT_ID_CREATE_LIST, oparg, args);
             TOUCH_STACK(oparg, -1);
             PyObject *list =  PyList_New(oparg);
             if (list == NULL)

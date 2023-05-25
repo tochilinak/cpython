@@ -6,6 +6,7 @@
 static void
 adapter_dealloc(PyObject *op) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) op;
+    Py_DECREF(adapter->ready_wrapper_types);
     Py_TYPE(op)->tp_free(op);
 }
 
@@ -14,12 +15,40 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) obj;
 
     if (!adapter->inside_handler) {
-        PyDict_SetItemString(frame->f_frame->f_globals, SYMBOLIC_HEADER, (PyObject *) frame->f_frame->f_code);
-        PyDict_SetItemString(frame->f_frame->f_globals, SYMBOLIC_ADAPTER_HEADER, obj);
         frame->f_trace_opcodes = 1;
     } else {
         frame->f_trace_opcodes = 0;
     }
+
+    if (what == PyTrace_OPCODE) {
+        PyObject *args[] = {(PyObject *) frame};
+        make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_INSTRUCTION, 1, args);
+    }
+
+    return 0;
+}
+
+int
+register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter) {
+    if (!PyCFunction_CheckExact(func))
+        return 1;
+    PyObject *obj = PyFunction_GET_CODE(func);
+    if (!PyCode_Check(obj))
+        return 1;
+    PyCodeObject *code = (PyCodeObject *) obj;
+    if (!PyTuple_CheckExact(code->co_consts))
+        return 1;
+    PyTupleObject *consts = (PyTupleObject *) code->co_consts;
+    Py_ssize_t n_consts = PyTuple_GET_SIZE(code->co_consts);
+    PyObject *last = PyTuple_GetItem(code->co_consts, n_consts - 1);
+    if (last == (PyObject *) adapter)
+        return 0;
+
+    PyTupleObject *new_consts = (PyTupleObject *) PyTuple_New(n_consts + 1);
+    memcpy(new_consts->ob_item, consts->ob_item, n_consts);
+    PyTuple_SET_ITEM(new_consts, n_consts, adapter);
+    code->co_consts = (PyObject *) new_consts;
+    Py_DECREF(consts);
 
     return 0;
 }
@@ -41,6 +70,7 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
     PyEval_SetTrace(trace_function, self);
     PyGILState_Release(gil);
 
+    register_symbolic_tracing(function, adapter);
     PyObject *result = Py_TYPE(function)->tp_call(function, wrappers, 0);
     // printf("result: %p %p %p\n", result, PyErr_Occurred(), PyCell_Get(cell));
 
@@ -115,11 +145,6 @@ PyTypeObject SymbolicAdapter_Type = {
     PyObject_Free,                              /* tp_free */
 };
 
-static PyObject *
-default_symbolic_handler(Py_ssize_t n, PyObject *const *args, void *callable) {
-    return make_call((PyObject *) callable, n, args);
-}
-
 static SymbolicAdapter *
 create_new_adapter_(symbolic_handler_callable handler, PyObject *ready_wrapper_types, void *handler_param) {
     SymbolicAdapter *result = PyObject_New(SymbolicAdapter, &SymbolicAdapter_Type);
@@ -137,35 +162,15 @@ create_new_adapter(symbolic_handler_callable handler, void *param) {
     return create_new_adapter_(handler, ready_wrapper_types, param);
 }
 
-SymbolicAdapter *
-create_new_adapter_obj(PyObject *callable) {
-    PyObject *ready_wrapper_types = PyDict_New();
-    return create_new_adapter_(default_symbolic_handler, ready_wrapper_types, callable);
-}
-
 PyObject *
-make_call_with_meta(PyObject *self, Py_ssize_t nargs, PyObject *const *args, PyObject *kwargs) {
-    PyObject *tuple = PyTuple_New(nargs);
-    for (int i = 0; i < nargs; i++) {
-        PyObject *cur = args[i];
-        if (!cur) cur = Py_None;
-        Py_INCREF(cur);
-        PyTuple_SetItem(tuple, i, cur);
-    }
-    PyObject *result = Py_TYPE(self)->tp_call(self, tuple, kwargs);
-    Py_DECREF(tuple);
+make_call_symbolic_handler(SymbolicAdapter *adapter, int event_type, int event_id, int nargs, PyObject *const *args) {
+    adapter->inside_handler++;
+    PyObject *result = adapter->handler(event_type, event_id, nargs, args, adapter->handler_param);
+    adapter->inside_handler--;
     return result;
 }
 
-PyObject *
-make_call(PyObject *self, Py_ssize_t nargs, PyObject *const *args) {
-    return make_call_with_meta(self, nargs, args, 0);
-}
-
-PyObject *
-make_call_symbolic_handler(SymbolicAdapter *adapter, Py_ssize_t nargs, PyObject *const *args) {
-    adapter->inside_handler = 1;
-    PyObject *result = adapter->handler(nargs, args, adapter->handler_param);
-    adapter->inside_handler = 0;
-    return result;
+int
+SymbolicAdapter_CheckExact(PyObject *obj) {
+    return Py_TYPE(obj) == &SymbolicAdapter_Type;
 }
