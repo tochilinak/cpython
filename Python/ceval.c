@@ -1498,6 +1498,7 @@ eval_frame_handle_pending(PyThreadState *tstate)
 
 #define symbolic_tracing_enabled \
     (cframe.use_tracing && \
+    consts && PyTuple_GET_SIZE(consts) && \
     SymbolicAdapter_CheckExact(GETITEM(consts, PyTuple_GET_SIZE(consts) - 1)) && \
     !((SymbolicAdapter *) GETITEM(consts, PyTuple_GET_SIZE(consts) - 1))->inside_handler)
 

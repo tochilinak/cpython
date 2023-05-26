@@ -30,23 +30,36 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
 
 int
 register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter) {
-    if (!PyCFunction_CheckExact(func))
+    if (!PyFunction_Check(func)) {
+        char buf[1000];
+        sprintf(buf, "Wrong type of callable: %s", Py_TYPE(func)->tp_name);
+        PyErr_SetString(PyExc_TypeError, buf);
         return 1;
+    }
     PyObject *obj = PyFunction_GET_CODE(func);
-    if (!PyCode_Check(obj))
+    if (!PyCode_Check(obj)) {
+        PyErr_SetString(PyExc_TypeError, "Wrong type of code object");
         return 1;
+    }
     PyCodeObject *code = (PyCodeObject *) obj;
-    if (!PyTuple_CheckExact(code->co_consts))
+    if (!PyTuple_CheckExact(code->co_consts)) {
+        PyErr_SetString(PyExc_TypeError, "Wrong type of consts holder");
         return 1;
+    }
+
     PyTupleObject *consts = (PyTupleObject *) code->co_consts;
-    Py_ssize_t n_consts = PyTuple_GET_SIZE(code->co_consts);
+    Py_ssize_t n_consts = PyTuple_GET_SIZE(consts);
     PyObject *last = PyTuple_GetItem(code->co_consts, n_consts - 1);
     if (last == (PyObject *) adapter)
         return 0;
 
     PyTupleObject *new_consts = (PyTupleObject *) PyTuple_New(n_consts + 1);
-    memcpy(new_consts->ob_item, consts->ob_item, n_consts);
+    memcpy(new_consts->ob_item, consts->ob_item, n_consts * sizeof(PyObject *));
+    for (int i = 0; i < n_consts; i++)
+        Py_XINCREF(PyTuple_GET_ITEM(code->co_consts, i));
     PyTuple_SET_ITEM(new_consts, n_consts, adapter);
+    Py_INCREF(adapter);
+
     code->co_consts = (PyObject *) new_consts;
     Py_DECREF(consts);
 
@@ -68,9 +81,13 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
 
     PyGILState_STATE gil = PyGILState_Ensure();
     PyEval_SetTrace(trace_function, self);
+    int r = register_symbolic_tracing(function, adapter);
     PyGILState_Release(gil);
 
-    register_symbolic_tracing(function, adapter);
+    if (r != 0) {
+        return 0;
+    }
+
     PyObject *result = Py_TYPE(function)->tp_call(function, wrappers, 0);
     // printf("result: %p %p %p\n", result, PyErr_Occurred(), PyCell_Get(cell));
 
