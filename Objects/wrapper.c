@@ -1,8 +1,9 @@
 #include <stddef.h>
 #include "wrapper.h"
 
-
 #define SLOT(func)                  PyType_Slot Wrapper_##func = {Py_##func, func};
+
+char const * const wrapper_type_name = "ibmviqhlye.___wrapper___ibmviqhlye";
 
 typedef struct {
     PyObject_HEAD
@@ -25,15 +26,13 @@ get_symbolic(PyObject *obj) {
     return ((Wrapper *) obj)->symbolic;
 }
 
-/*
-static PyObject *
+PyObject *
 get_symbolic_or_none(PyObject *obj) {
     PyObject *res = get_symbolic(obj);
     if (!res)
         return Py_None;
     return res;
 }
-*/
 
 static void
 tp_dealloc(PyObject *op) {
@@ -83,9 +82,6 @@ SLOT(tp_descr_set)
 
 static PyObject *
 tp_getattro(PyObject *self, PyObject *other) {
-    if (Py_TYPE(other) == &PyUnicode_Type && PyUnicode_CompareWithASCIIString(other, CONCRETE_HEADER) == 0)
-        return PyUnicode_FromString(Py_TYPE(((Wrapper*)self)->concrete)->tp_name);
-
     PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_getattro == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_getattro");
@@ -647,7 +643,7 @@ PyTypeObject *
 create_new_wrapper_type(PyObject *concrete) {
     PyType_Slot *slots = create_slot_list(concrete);
     PyType_Spec spec = {
-            WrapperTypeName,
+            wrapper_type_name,
             sizeof(Wrapper),
             0,
             Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE,
@@ -662,7 +658,7 @@ int
 is_wrapped(PyObject *obj) {
     if (!obj || !obj->ob_type)
         return 0;
-    return strcmp(obj->ob_type->tp_name, WrapperTypeName) == 0;
+    return strcmp(Py_TYPE(obj)->tp_name, wrapper_type_name) == 0;  // TODO: do it through base type
 }
 
 PyObject *
