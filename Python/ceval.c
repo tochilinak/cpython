@@ -3919,6 +3919,13 @@ handle_eval_breaker:
             assert(oparg <= Py_GE);
             PyObject *right = POP();
             PyObject *left = TOP();
+
+            if (oparg == Py_GT) {
+                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_STACK, SYM_EVENT_ID_GT, 2, get_symbolic_or_none(left), get_symbolic_or_none(right));
+                right = unwrap(right); // for now
+                left = unwrap(left); // for now
+            }
+
             PyObject *res = PyObject_RichCompare(left, right, oparg);
             SET_TOP(res);
             Py_DECREF(left);

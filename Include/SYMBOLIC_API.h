@@ -13,5 +13,6 @@ typedef PyObject *(*symbolic_handler_callable)(int event_type, int event_id, int
 #define SYM_EVENT_ID_INSTRUCTION  2
 #define SYM_EVENT_ID_FORK         3
 #define SYM_EVENT_ID_FORK_RESULT  4
+#define SYM_EVENT_ID_GT           5
 
 #endif //CPYTHON_SYMBOLIC_API_H
