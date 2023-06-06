@@ -26,5 +26,6 @@ typedef PyObject *(*symbolic_handler_callable)(int event_type, int event_id, int
 #define SYM_EVENT_ID_INT_MULT     14
 #define SYM_EVENT_ID_INT_REM      15
 #define SYM_EVENT_ID_INT_FLOORDIV 16
+#define SYM_EVENT_ID_INT_POW      17
 
 #endif //CPYTHON_SYMBOLIC_API_H

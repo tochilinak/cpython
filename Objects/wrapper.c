@@ -313,7 +313,8 @@ SLOT(tp_hash)
                                         return wrap(result, symbolic, adapter); \
                                     }
 
-#define TERNARY_FUN_AS(func, tp_as) static PyObject * \
+#define TERNARY_FUN_AS(func, tp_as, event_id_getter) \
+                                    static PyObject * \
                                     func(PyObject *self, PyObject *o1, PyObject *o2) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
@@ -325,9 +326,11 @@ SLOT(tp_hash)
                                         ternaryfunc fun = 0; \
                                         if (concrete_self->ob_type->tp_as && concrete_self->ob_type->tp_as->func) \
                                             fun = concrete_self->ob_type->tp_as->func; \
+                                        int event_id = -1; \
                                         for (int i = 0; i <= 1; i++) { \
                                             if (fun) { \
                                                 result = fun(concrete_self, concrete_o1, concrete_o2); \
+                                                event_id = event_id_getter(fun); \
                                             } \
                                             if (result != Py_NotImplemented) \
                                                 break; \
@@ -335,7 +338,12 @@ SLOT(tp_hash)
                                                 fun = concrete_o1->ob_type->tp_as->func; \
                                             } \
                                         } \
-                                        return wrap(result, Py_None, adapter); \
+                                        PyObject *symbolic = Py_None; \
+                                        if (event_id != -1) { \
+                                            PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)}; \
+                                            symbolic = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 3, args); \
+                                        }\
+                                        return wrap(result, symbolic, adapter); \
                                     }
 
 #define LEN_FUN_AS(func, tp_as)     static Py_ssize_t \
@@ -461,7 +469,13 @@ SLOT(nb_remainder)
 
 BINARY_FUN_AS(nb_divmod, tp_as_number, default_event_id_getter)
 SLOT(nb_divmod)
-TERNARY_FUN_AS(nb_power, tp_as_number)
+
+static int get_nb_power_event_id(ternaryfunc func) {
+    if (func == PyLong_Type.tp_as_number->nb_power)
+        return SYM_EVENT_ID_INT_POW;
+    return -1;
+}
+TERNARY_FUN_AS(nb_power, tp_as_number, get_nb_power_event_id)
 SLOT(nb_power)
 
 static int get_nb_neg_event_id(unaryfunc func) {
@@ -532,7 +546,7 @@ BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_event_id_getter)
 SLOT(nb_inplace_multiply)
 BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_event_id_getter)
 SLOT(nb_inplace_remainder)
-TERNARY_FUN_AS(nb_inplace_power, tp_as_number)
+TERNARY_FUN_AS(nb_inplace_power, tp_as_number, default_event_id_getter)
 SLOT(nb_inplace_power)
 BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_event_id_getter)
 SLOT(nb_inplace_lshift)
