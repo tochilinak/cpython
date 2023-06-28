@@ -20,12 +20,14 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
         frame->f_trace_opcodes = 0;
     }
 
+    PyObject *result = 0;
+
     if (what == PyTrace_OPCODE) {
         PyObject *args[] = {(PyObject *) frame};
-        make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_INSTRUCTION, 1, args);
+        result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_INSTRUCTION, 1, args);
     }
 
-    return 0;
+    return !(result == Py_None || result == 0);
 }
 
 int
