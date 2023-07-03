@@ -25,6 +25,8 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
     if (what == PyTrace_OPCODE) {
         PyObject *args[] = {(PyObject *) frame};
         result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_INSTRUCTION, 1, args);
+    } else if (what == PyTrace_RETURN) {
+        result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_RETURN, 0, 0);
     }
 
     return !(result == Py_None || result == 0);
@@ -90,6 +92,8 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
         return 0;
     }
 
+    PyObject *args_for_handler[] = { function };
+    make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args_for_handler);
     PyObject *result = Py_TYPE(function)->tp_call(function, wrappers, 0);
     // printf("result: %p %p %p\n", result, PyErr_Occurred(), PyCell_Get(cell));
 

@@ -9,23 +9,25 @@ typedef PyObject *(*symbolic_handler_callable)(int event_type, int event_id, int
 #define SYM_EVENT_TYPE_METHOD  2
 
 // event ids
-#define SYM_EVENT_ID_CREATE_LIST  0
-#define SYM_EVENT_ID_CONST        1
-#define SYM_EVENT_ID_INSTRUCTION  2
-#define SYM_EVENT_ID_FORK         3
-#define SYM_EVENT_ID_FORK_RESULT  4
-#define SYM_EVENT_ID_INT_GT       5
-#define SYM_EVENT_ID_INT_LT       6
-#define SYM_EVENT_ID_INT_EQ       7
-#define SYM_EVENT_ID_INT_NE       8
-#define SYM_EVENT_ID_INT_GE       9
-#define SYM_EVENT_ID_INT_LE       10
-#define SYM_EVENT_ID_INT_ADD      11
-#define SYM_EVENT_ID_INT_SUB      12
-#define SYM_EVENT_ID_INT_NEG      13
-#define SYM_EVENT_ID_INT_MULT     14
-#define SYM_EVENT_ID_INT_REM      15
-#define SYM_EVENT_ID_INT_FLOORDIV 16
-#define SYM_EVENT_ID_INT_POW      17
+#define SYM_EVENT_ID_CREATE_LIST          0
+#define SYM_EVENT_ID_CONST                1
+#define SYM_EVENT_ID_INSTRUCTION          2
+#define SYM_EVENT_ID_FORK                 3
+#define SYM_EVENT_ID_FORK_RESULT          4
+#define SYM_EVENT_ID_INT_GT               5
+#define SYM_EVENT_ID_INT_LT               6
+#define SYM_EVENT_ID_INT_EQ               7
+#define SYM_EVENT_ID_INT_NE               8
+#define SYM_EVENT_ID_INT_GE               9
+#define SYM_EVENT_ID_INT_LE               10
+#define SYM_EVENT_ID_INT_ADD              11
+#define SYM_EVENT_ID_INT_SUB              12
+#define SYM_EVENT_ID_INT_NEG              13
+#define SYM_EVENT_ID_INT_MULT             14
+#define SYM_EVENT_ID_INT_REM              15
+#define SYM_EVENT_ID_INT_FLOORDIV         16
+#define SYM_EVENT_ID_INT_POW              17
+#define SYM_EVENT_ID_PYTHON_FUNCTION_CALL 18
+#define SYM_EVENT_ID_RETURN               19
 
 #endif //CPYTHON_SYMBOLIC_API_H

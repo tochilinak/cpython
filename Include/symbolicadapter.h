@@ -16,6 +16,7 @@ typedef struct {
 
 #include "wrapper.h"
 
+int register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter);
 PyAPI_FUNC(SymbolicAdapter*) create_new_adapter(symbolic_handler_callable handler, void *param);
 PyAPI_FUNC(PyObject*) SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args);
 PyObject *make_call_symbolic_handler(SymbolicAdapter *adapter, int event_type, int event_id, int nargs, PyObject *const *args);

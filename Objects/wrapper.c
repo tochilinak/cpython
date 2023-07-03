@@ -156,6 +156,18 @@ SLOT(tp_richcompare)
 static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     PyObject *concrete_self = unwrap(self);
+    SymbolicAdapter *adapter = get_adapter(self);
+
+    if (PyFunction_Check(concrete_self)) {
+        int res = register_symbolic_tracing(concrete_self, adapter);
+        if (res != 0)
+            return 0;
+
+        PyObject *args[] = { concrete_self };
+        make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args);
+        return Py_TYPE(concrete_self)->tp_call(concrete_self, o1, o2);
+    }
+
     PyObject *concrete_o1 = 0;
     if (o1) {
         concrete_o1 = PyTuple_New(PyTuple_GET_SIZE(o1));
@@ -180,7 +192,6 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         PyErr_SetString(PyExc_TypeError, "no tp_call");
         return 0;
     }
-    SymbolicAdapter *adapter = get_adapter(self);
     return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), 0, adapter);
 }
 SLOT(tp_call)
