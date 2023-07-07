@@ -12,7 +12,7 @@ typedef struct {
     SymbolicAdapter *adapter;
 } Wrapper;
 
-static SymbolicAdapter *
+SymbolicAdapter *
 get_adapter(PyObject *obj) {
     if (!obj || !is_wrapped(obj))
         return 0;
@@ -373,12 +373,12 @@ SLOT(tp_hash)
                                         return concrete_self->ob_type->tp_as->func(concrete_self); \
                                     }
 
+// this one returns unwrapped value
 #define SIZEARG_FUN_AS(func, tp_as) static PyObject * \
                                     func(PyObject *self, Py_ssize_t i) \
                                     { \
                                         /*printf("calling %s on %p\n", #func, self);*/ \
                                         PyObject *concrete_self = unwrap(self); \
-                                        SymbolicAdapter *adapter = get_adapter(self); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
                                             return 0; \
@@ -387,7 +387,7 @@ SLOT(tp_hash)
                                              PyErr_SetString(PyExc_TypeError, "no func"); \
                                              return 0; \
                                         } \
-                                        return wrap(concrete_self->ob_type->tp_as->func(concrete_self, i), Py_None, adapter); \
+                                        return concrete_self->ob_type->tp_as->func(concrete_self, i); \
                                     }
 
 #define SIZEOBJARG_AS(func, tp_as)  static int \
@@ -614,8 +614,16 @@ SLOT(sq_concat)
 SIZEARG_FUN_AS(sq_repeat, tp_as_sequence)
 SLOT(sq_repeat)
 
+/*
+int get_sq_item_event_id(ssizeargfunc func) {
+    if (func == PyList_Type.tp_as_sequence->sq_item)
+        return SYM_EVENT_ID_LIST_GET_ITEM;
+    return -1;
+}
+*/
 SIZEARG_FUN_AS(sq_item, tp_as_sequence)
 SLOT(sq_item)
+
 SIZEOBJARG_AS(sq_ass_item, tp_as_sequence)
 SLOT(sq_ass_item)
 OBJOBJ_AS(sq_contains, tp_as_sequence)
@@ -628,7 +636,13 @@ SLOT(sq_inplace_repeat)
 
 LEN_FUN_AS(mp_length, tp_as_mapping)
 SLOT(mp_length)
-BINARY_FUN_AS(mp_subscript, tp_as_mapping, default_event_id_getter)
+
+static int get_mp_subscript_event_id(binaryfunc func) {
+    if (func == PyList_Type.tp_as_mapping->mp_subscript)
+        return SYM_EVENT_ID_LIST_GET_ITEM;
+    return -1;
+}
+BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_event_id)
 SLOT(mp_subscript)
 OBJOBJARG_AS(mp_ass_subscript, tp_as_mapping)
 SLOT(mp_ass_subscript)

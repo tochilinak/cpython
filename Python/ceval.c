@@ -1608,7 +1608,7 @@ do { \
     set_adapter_if_symbolic_tracing_enabled \
     if (adapter) { \
         PyObject *result = make_call_symbolic_handler(adapter, event_type, event_id, nargs, args); \
-        if (result && result != Py_None && event_type == SYM_EVENT_TYPE_STACK) { \
+        if (result && result != Py_None && (event_type) == SYM_EVENT_TYPE_STACK) { \
             if (!PyTuple_CheckExact(result)) { \
                  PyErr_SetString(PyExc_AssertionError, "Symbolic handler must return tuple"); \
                  goto error; \
@@ -3472,6 +3472,14 @@ handle_eval_breaker:
         }
 
         TARGET(LIST_EXTEND) {  // REQUIRES UNWRAPPED
+            PyObject *symbolic_result = Py_None;
+            SymbolicAdapter *adapter_loc = 0;
+            if (is_wrapped(PEEK(oparg + 1))) {
+                adapter_loc = get_adapter(PEEK(oparg + 1));
+                PyObject *args[] = {get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP())};
+                symbolic_result = make_call_symbolic_handler(adapter_loc, SYM_EVENT_TYPE_METHOD, SYM_EVENT_ID_LIST_EXTEND, 2, args);
+                if (!symbolic_result) symbolic_result = Py_None;
+            }
             TOUCH_STACK(oparg + 1, -1);
             PyObject *iterable = POP();
             PyObject *list = PEEK(oparg);
@@ -3488,6 +3496,8 @@ handle_eval_breaker:
                 Py_DECREF(iterable);
                 goto error;
             }
+            if (adapter_loc)
+                PEEK(oparg) = wrap(PEEK(oparg), symbolic_result, adapter_loc);
             Py_DECREF(none_val);
             Py_DECREF(iterable);
             DISPATCH();
