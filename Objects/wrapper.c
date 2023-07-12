@@ -407,10 +407,11 @@ SLOT(tp_hash)
                                         return concrete_self->ob_type->tp_as->func(concrete_self, i, concrete_other); \
                                     }
 
-#define OBJOBJARG_AS(func, tp_as)   static int \
+#define OBJOBJARG_AS(func, tp_as, event_id_getter) \
+                                    static int \
                                     func(PyObject *self, PyObject *o1, PyObject *o2) \
                                     { \
-                                        /*printf("calling %s on %p\n", #func, self);*/ \
+                                        /*printf("calling %s on %p\n", #func, self); fflush(stdout);*/ \
                                         PyObject *concrete_self = unwrap(self); \
                                         PyObject *concrete_o1 = unwrap(o1); \
                                         PyObject *concrete_o2 = unwrap(o2); \
@@ -419,8 +420,14 @@ SLOT(tp_hash)
                                             return 0; \
                                         } \
                                         if (concrete_self->ob_type->tp_as->func == 0) { \
-                                             PyErr_SetString(PyExc_TypeError, "no func"); \
-                                             return 0; \
+                                            PyErr_SetString(PyExc_TypeError, "no func"); \
+                                            return 0; \
+                                        } \
+                                        int event_id = event_id_getter(concrete_self->ob_type->tp_as->func); \
+                                        SymbolicAdapter *adapter = get_adapter(self); \
+                                        if (event_id != -1 && adapter) { \
+                                            PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)}; \
+                                            make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, event_id, 3, args); \
                                         } \
                                         return concrete_self->ob_type->tp_as->func(concrete_self, concrete_o1, concrete_o2); \
                                     }
@@ -644,7 +651,12 @@ static int get_mp_subscript_event_id(binaryfunc func) {
 }
 BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_event_id)
 SLOT(mp_subscript)
-OBJOBJARG_AS(mp_ass_subscript, tp_as_mapping)
+static int get_mp_ass_subscript_event_id(objobjargproc func) {
+    if (func == PyList_Type.tp_as_mapping->mp_ass_subscript)
+        return SYM_EVENT_ID_LIST_SET_ITEM;
+    return -1;
+}
+OBJOBJARG_AS(mp_ass_subscript, tp_as_mapping, get_mp_ass_subscript_event_id)
 SLOT(mp_ass_subscript)
 
 PyType_Slot final_slot = {0, NULL};

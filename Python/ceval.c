@@ -2425,17 +2425,28 @@ handle_eval_breaker:
             goto start_frame;
         }
 
-        TARGET(LIST_APPEND) {  // MUST BE UNWRAPPED
+        TARGET(LIST_APPEND) {  // REQUIRES UNWRAPPED
+            PyObject *symbolic_result = Py_None;
+            SymbolicAdapter *adapter_loc = 0;
+            if (is_wrapped(PEEK(oparg + 1))) {
+                adapter_loc = get_adapter(PEEK(oparg + 1));
+                PyObject *args[] = {get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP())};
+                symbolic_result = make_call_symbolic_handler(adapter_loc, SYM_EVENT_TYPE_METHOD, SYM_EVENT_ID_LIST_APPEND, 2, args);
+                if (!symbolic_result) symbolic_result = Py_None;
+            }
             TOUCH_STACK(oparg + 1, -1);
             PyObject *v = POP();
             PyObject *list = PEEK(oparg);
             if (_PyList_AppendTakeRef((PyListObject *)list, v) < 0)
                 goto error;
+            if (adapter_loc) {
+                PEEK(oparg) = wrap(PEEK(oparg), symbolic_result, adapter_loc);
+            }
             PREDICT(JUMP_BACKWARD_QUICK);
             DISPATCH();
         }
 
-        TARGET(SET_ADD) {  // MUST BE UNWRAPPED
+        TARGET(SET_ADD) {  // REQUIRES UNWRAPPED
             TOUCH_STACK(oparg + 1, -1);
             PyObject *v = POP();
             PyObject *set = PEEK(oparg);
