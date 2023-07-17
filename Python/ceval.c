@@ -4265,7 +4265,8 @@ handle_eval_breaker:
                 DISPATCH();
             }
             int err = PyObject_IsTrue(cond);
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
+            if (err >= 0)
+                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             Py_DECREF(cond);
             if (err > 0)
                 ;
@@ -4294,7 +4295,8 @@ handle_eval_breaker:
             }
             else {
                 int err = PyObject_IsTrue(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
+                if (err >= 0)
+                    CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
                 Py_DECREF(cond);
                 if (err > 0)
                     ;
@@ -4324,7 +4326,8 @@ handle_eval_breaker:
                 DISPATCH();
             }
             int err = PyObject_IsTrue(cond);
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
+            if (err >= 0)
+                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             Py_DECREF(cond);
             if (err > 0) {
                 JUMPBY(-oparg);
@@ -4352,7 +4355,8 @@ handle_eval_breaker:
             }
             else {
                 int err = PyObject_IsTrue(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
+                if (err >= 0)
+                    CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
                 Py_DECREF(cond);
                 if (err > 0) {
                     JUMPBY(oparg);
@@ -4432,7 +4436,8 @@ handle_eval_breaker:
                 DISPATCH();
             }
             err = PyObject_IsTrue(cond);
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
+            if (err >= 0)
+                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             if (err > 0) {
                 STACK_SHRINK(1);
                 Py_DECREF(cond);
@@ -4461,7 +4466,8 @@ handle_eval_breaker:
                 DISPATCH();
             }
             err = PyObject_IsTrue(cond);
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
+            if (err >= 0)
+                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             if (err > 0) {
                 JUMPBY(oparg);
             }

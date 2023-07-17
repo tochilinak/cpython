@@ -767,7 +767,7 @@ create_slot_list(PyObject *concrete) {
     return slots;
 }
 
-PyTypeObject *
+static PyTypeObject *
 create_new_wrapper_type(PyObject *concrete) {
     PyType_Slot *slots = create_slot_list(concrete);
     PyType_Spec spec = {
