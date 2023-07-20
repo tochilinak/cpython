@@ -22,10 +22,10 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
 
     PyObject *result = 0;
 
-    if (what == PyTrace_OPCODE) {
+    if (what == PyTrace_OPCODE && !adapter->ignore) {
         PyObject *args[] = {(PyObject *) frame};
         result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_INSTRUCTION, 1, args);
-    } else if (what == PyTrace_RETURN) {
+    } else if (what == PyTrace_RETURN && !adapter->ignore) {
         result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_RETURN, 0, 0);
     }
 
@@ -176,6 +176,7 @@ create_new_adapter_(symbolic_handler_callable handler, PyObject *ready_wrapper_t
     result->handler_param = handler_param;
     result->ready_wrapper_types = ready_wrapper_types;
     result->inside_handler = 0;
+    result->ignore = 0;
     return result;
 }
 
@@ -197,3 +198,5 @@ int
 SymbolicAdapter_CheckExact(PyObject *obj) {
     return Py_TYPE(obj) == &SymbolicAdapter_Type;
 }
+
+void *virtual_tp_richcompare = 0;

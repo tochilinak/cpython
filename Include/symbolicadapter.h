@@ -12,6 +12,7 @@ typedef struct {
     void *handler_param;
     PyObject *ready_wrapper_types;
     char inside_handler;
+    int ignore;
 } SymbolicAdapter;
 
 #include "wrapper.h"
