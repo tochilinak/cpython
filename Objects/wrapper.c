@@ -147,8 +147,8 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
     SymbolicAdapter *adapter = get_adapter(self);
     PyObject *symbolic_self = get_symbolic_or_none(self);
     PyObject *symbolic_other = get_symbolic_or_none(other);
-    PyObject *args[] = {symbolic_self, symbolic_other};
-    make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_TP_RICHCMP, 2, args);
+    PyObject *args[] = {symbolic_self, symbolic_other, PyLong_FromLong(op)};
+    make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_TP_RICHCMP, 3, args);
 
     PyObject *concrete_result = concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op);
     int event_id = tp_richcompare_event_id_getter(concrete_self->ob_type->tp_richcompare, op);
