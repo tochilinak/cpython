@@ -1622,6 +1622,7 @@ do { \
             } \
             Py_DECREF(result); \
         } \
+        if (PyErr_Occurred()) goto error; \
     } \
 } while (0)
 
