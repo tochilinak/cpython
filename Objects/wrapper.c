@@ -307,16 +307,19 @@ SLOT(tp_hash)
                                         return wrap(concrete_result, symbolic, adapter); \
                                     }
 
-#define BINARY_FUN_AS(func, tp_as, event_id_getter) \
+#define BINARY_FUN_AS(func, tp_as, event_id_getter, notify_id) \
                                     static PyObject * \
                                     func(PyObject *self, PyObject *other) \
                                     { \
-                                        PyObject *concrete_self = unwrap(self); \
-                                        PyObject *concrete_other = unwrap(other); \
-                                        PyObject *result = Py_NotImplemented; \
+                                        PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(other)}; \
                                         SymbolicAdapter *adapter = get_adapter(self); \
                                         if (!adapter) \
                                             adapter = get_adapter(other); \
+                                        if (notify_id != -1) \
+                                            make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, notify_id, 2, args); \
+                                        PyObject *concrete_self = unwrap(self); \
+                                        PyObject *concrete_other = unwrap(other); \
+                                        PyObject *result = Py_NotImplemented; \
                                         binaryfunc fun = 0; \
                                         if (concrete_self->ob_type->tp_as && concrete_self->ob_type->tp_as->func) \
                                             fun = concrete_self->ob_type->tp_as->func; \
@@ -335,7 +338,6 @@ SLOT(tp_hash)
                                         PyObject *symbolic = Py_None;      \
                                         int event_id = event_id_getter(result_fun); \
                                         if (event_id != -1 && result != Py_NotImplemented) {             \
-                                            PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(other)}; \
                                             symbolic = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 2, args); \
                                             if (!symbolic) return 0; \
                                         }\
@@ -478,7 +480,7 @@ static int get_nb_add_event_id(binaryfunc func) {
         return SYM_EVENT_ID_INT_ADD;
     return -1;
 }
-BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_event_id)
+BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_event_id, -1)
 SLOT(nb_add)
 
 static int get_nb_sub_event_id(binaryfunc func) {
@@ -486,7 +488,7 @@ static int get_nb_sub_event_id(binaryfunc func) {
         return SYM_EVENT_ID_INT_SUB;
     return -1;
 }
-BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_event_id)
+BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_event_id, -1)
 SLOT(nb_subtract)
 
 static int get_nb_mult_event_id(binaryfunc func) {
@@ -494,7 +496,7 @@ static int get_nb_mult_event_id(binaryfunc func) {
         return SYM_EVENT_ID_INT_MULT;
     return -1;
 }
-BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_event_id)
+BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_event_id, -1)
 SLOT(nb_multiply)
 
 static int get_nb_rem_event_id(binaryfunc func) {
@@ -502,10 +504,10 @@ static int get_nb_rem_event_id(binaryfunc func) {
         return SYM_EVENT_ID_INT_REM;
     return -1;
 }
-BINARY_FUN_AS(nb_remainder, tp_as_number, get_nb_rem_event_id)
+BINARY_FUN_AS(nb_remainder, tp_as_number, get_nb_rem_event_id, -1)
 SLOT(nb_remainder)
 
-BINARY_FUN_AS(nb_divmod, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_divmod, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_divmod)
 
 static int get_nb_power_event_id(ternaryfunc func) {
@@ -534,15 +536,15 @@ SLOT(nb_bool)
 
 UNARY_FUN_AS(nb_invert, tp_as_number, default_event_id_getter)
 SLOT(nb_invert)
-BINARY_FUN_AS(nb_lshift, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_lshift, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_lshift)
-BINARY_FUN_AS(nb_rshift, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_rshift, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_rshift)
-BINARY_FUN_AS(nb_and, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_and, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_and)
-BINARY_FUN_AS(nb_xor, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_xor, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_xor)
-BINARY_FUN_AS(nb_or, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_or, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_or)
 
 // must return int
@@ -582,25 +584,25 @@ nb_float(PyObject *self) {
 }
 SLOT(nb_float)
 
-BINARY_FUN_AS(nb_inplace_add, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_add, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_add)
-BINARY_FUN_AS(nb_inplace_subtract, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_subtract, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_subtract)
-BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_multiply)
-BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_remainder)
 TERNARY_FUN_AS(nb_inplace_power, tp_as_number, default_event_id_getter)
 SLOT(nb_inplace_power)
-BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_lshift)
-BINARY_FUN_AS(nb_inplace_rshift, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_rshift, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_rshift)
-BINARY_FUN_AS(nb_inplace_and, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_and, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_and)
-BINARY_FUN_AS(nb_inplace_xor, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_xor, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_xor)
-BINARY_FUN_AS(nb_inplace_or, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_or, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_or)
 
 static int get_nb_floor_div_event_id(binaryfunc func) {
@@ -608,14 +610,14 @@ static int get_nb_floor_div_event_id(binaryfunc func) {
         return SYM_EVENT_ID_INT_FLOORDIV;
     return -1;
 }
-BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_event_id)
+BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_event_id, -1)
 SLOT(nb_floor_divide)
 
-BINARY_FUN_AS(nb_true_divide, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_true_divide, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_true_divide)
-BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_floor_divide)
-BINARY_FUN_AS(nb_inplace_true_divide, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_true_divide, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_true_divide)
 
 // must return integer
@@ -634,14 +636,14 @@ nb_index(PyObject *self) {
 }
 SLOT(nb_index)
 
-BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_matrix_multiply)
-BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_event_id_getter)
+BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_event_id_getter, -1)
 SLOT(nb_inplace_matrix_multiply)
 
 LEN_FUN_AS(sq_length, tp_as_sequence)
 SLOT(sq_length)
-BINARY_FUN_AS(sq_concat, tp_as_sequence, default_event_id_getter)
+BINARY_FUN_AS(sq_concat, tp_as_sequence, default_event_id_getter, -1)
 SLOT(sq_concat)
 
 SIZEARG_FUN_AS(sq_repeat, tp_as_sequence)
@@ -661,7 +663,7 @@ SIZEOBJARG_AS(sq_ass_item, tp_as_sequence)
 SLOT(sq_ass_item)
 OBJOBJ_AS(sq_contains, tp_as_sequence)
 SLOT(sq_contains)
-BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, default_event_id_getter)
+BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, default_event_id_getter, -1)
 SLOT(sq_inplace_concat)
 
 SIZEARG_FUN_AS(sq_inplace_repeat, tp_as_sequence)
@@ -673,9 +675,11 @@ SLOT(mp_length)
 static int get_mp_subscript_event_id(binaryfunc func) {
     if (func == PyList_Type.tp_as_mapping->mp_subscript)
         return SYM_EVENT_ID_LIST_GET_ITEM;
+    if (func == virtual_mp_subscript)
+        return SYM_EVENT_ID_VIRTUAL_MP_SUBSCRIPT;
     return -1;
 }
-BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_event_id)
+BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_event_id, SYM_EVENT_ID_MP_SUBSCRIPT)
 SLOT(mp_subscript)
 static int get_mp_ass_subscript_event_id(objobjargproc func) {
     if (func == PyList_Type.tp_as_mapping->mp_ass_subscript)

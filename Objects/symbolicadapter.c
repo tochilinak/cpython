@@ -200,3 +200,4 @@ SymbolicAdapter_CheckExact(PyObject *obj) {
 }
 
 void *virtual_tp_richcompare = 0;
+void *virtual_mp_subscript = 0;

@@ -34,10 +34,13 @@ typedef PyObject *(*symbolic_handler_callable)(int event_type, int event_id, int
 #define SYM_EVENT_ID_LIST_EXTEND          22
 #define SYM_EVENT_ID_LIST_APPEND          23
 #define SYM_EVENT_ID_VIRTUAL_RICHCMP      24
-#define SYM_EVENT_ID_NB_BOOL              25
-#define SYM_EVENT_ID_NB_INT               26
-#define SYM_EVENT_ID_TP_RICHCMP           27
+#define SYM_EVENT_ID_VIRTUAL_MP_SUBSCRIPT 25
+#define SYM_EVENT_ID_NB_BOOL              26
+#define SYM_EVENT_ID_NB_INT               27
+#define SYM_EVENT_ID_MP_SUBSCRIPT         28
+#define SYM_EVENT_ID_TP_RICHCMP           29
 
 PyAPI_DATA(void*) virtual_tp_richcompare;
+PyAPI_DATA(void*) virtual_mp_subscript;
 
 #endif //CPYTHON_SYMBOLIC_API_H
