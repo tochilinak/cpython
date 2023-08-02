@@ -1705,8 +1705,6 @@ builtin_len(PyObject *module, PyObject *obj)
     return PyLong_FromSsize_t(res);
 }
 
-void *EXPORT_FOR_APPROXIMATION_BUILTIN_LEN = builtin_len;
-
 
 /*[clinic input]
 locals as builtin_locals
@@ -3090,3 +3088,6 @@ _PyBuiltin_Init(PyInterpreterState *interp)
 #undef ADD_TO_ALL
 #undef SETBUILTIN
 }
+
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_LEN = builtin_len;
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_ISINSTANCE = builtin_isinstance;

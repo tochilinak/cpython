@@ -37,6 +37,7 @@ typedef struct {
     PyObject *(*list_extend)(void *, PyObject *list, PyObject *iterable);
     PyObject *(*list_append)(void *, PyObject *list, PyObject *elem);
     PyObject *(*list_get_size)(void *, PyObject *list);
+    PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
     int (*nb_add)(void *, PyObject *left, PyObject *right);
     int (*nb_subtract)(void *, PyObject *left, PyObject *right);
     int (*nb_multiply)(void *, PyObject *left, PyObject *right);
@@ -73,6 +74,7 @@ typedef struct {
     void *virtual_nb_add;
     void *virtual_mp_subscript;
     PyObject *(*approximation_builtin_len)(PyObject *);
+    PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);
     unary_handler default_unary_handler;
     binary_handler default_binary_handler;
     ternary_handler default_ternary_handler;

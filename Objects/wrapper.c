@@ -175,6 +175,13 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
         PyObject *obj = PyTuple_GetItem(o1, 0);
         *called_approximation = 1;
         return adapter->approximation_builtin_len(obj);
+    } else if (c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_ISINSTANCE && adapter->approximation_builtin_isinstance) {
+        if (o2 || !PyTuple_Check(o1) || PyTuple_GET_SIZE(o1) != 2)
+            return 0;
+        PyObject *obj = PyTuple_GetItem(o1, 0);
+        PyObject *type = PyTuple_GetItem(o1, 1);
+        *called_approximation = 1;
+        return adapter->approximation_builtin_isinstance(obj, type);
     }
     return 0;
 }
