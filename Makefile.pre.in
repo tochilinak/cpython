@@ -1477,7 +1477,6 @@ regen-typeslots:
 # Header files
 
 PYTHON_HEADERS= \
-        $(srcdir)/Include/SYMBOLIC_API.h \
 		$(srcdir)/Include/Python.h \
 		$(srcdir)/Include/abstract.h \
 		$(srcdir)/Include/bltinmodule.h \

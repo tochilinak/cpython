@@ -1499,10 +1499,9 @@ eval_frame_handle_pending(PyThreadState *tstate)
 #define symbolic_tracing_enabled \
     (cframe.use_tracing && \
     consts && PyTuple_GET_SIZE(consts) && \
-    SymbolicAdapter_CheckExact(GETITEM(consts, PyTuple_GET_SIZE(consts) - 1)) && \
-    !((SymbolicAdapter *) GETITEM(consts, PyTuple_GET_SIZE(consts) - 1))->inside_handler)
+    SymbolicAdapter_CheckExact(GETITEM(consts, PyTuple_GET_SIZE(consts) - 1)))
 
-#define set_adapter_if_symbolic_tracing_enabled \
+#define set_adapter_if_symbolic_tracing_enabled(adapter) \
     SymbolicAdapter *adapter = 0; \
     if (symbolic_tracing_enabled) adapter = (SymbolicAdapter *) GETITEM(consts, PyTuple_GET_SIZE(consts) - 1);
 
@@ -1552,7 +1551,7 @@ do { \
 
 #define WRAP() \
 do { \
-    set_adapter_if_symbolic_tracing_enabled \
+    set_adapter_if_symbolic_tracing_enabled(adapter) \
     if (adapter != 0 && frame->stacktop == -1) { \
         for (int i = 1; i <= STACK_LEVEL(); i++) { \
             PyObject *s = stack_pointer[-i]; \
@@ -1560,17 +1559,9 @@ do { \
                 continue; \
             if (is_wrapped(s)) \
                 break; \
-            PyObject *symbolic = Py_None; \
-            if (symbolic_for_stack && i <= n_symbolic_for_stack) { \
-                symbolic = symbolic_for_stack[i - 1]; \
-            } \
-            stack_pointer[-i] = wrap(s, symbolic, adapter); \
+            stack_pointer[-i] = wrap(s, Py_None, adapter); \
             Py_DECREF(s); \
         } \
-        if (symbolic_for_stack) \
-            PyMem_RawFree(symbolic_for_stack); \
-        symbolic_for_stack = 0; \
-        n_symbolic_for_stack = 0; \
         if (frame->frame_obj && !frame->frame_obj->f_fast_as_locals) { \
             /* At index 0 is the executed code */   \
             for (int i = 1; i < frame->f_code->co_nlocalsplus; i++) { \
@@ -1597,6 +1588,7 @@ do { \
     } \
 } while (0)
 
+/*
 #define CALL_SYMBOLIC_HANDLER(event_type, event_id, nargs, ...) \
 do { \
     PyObject *args[] = {__VA_ARGS__}; \
@@ -1625,6 +1617,7 @@ do { \
         if (PyErr_Occurred()) goto error; \
     } \
 } while (0)
+*/
 
 /* Shared opcode macros */
 
@@ -1823,8 +1816,6 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
     _Py_CODEUNIT *first_instr;
     _Py_CODEUNIT *next_instr;
     PyObject **stack_pointer;
-    PyObject **symbolic_for_stack = 0;
-    int n_symbolic_for_stack = 0;
 
 /* Sets the above local variables from the frame */
 #define SET_LOCALS_FROM_FRAME() \
@@ -1951,7 +1942,12 @@ handle_eval_breaker:
             PyObject *value = GETITEM(consts, oparg);
             Py_INCREF(value);
             PUSH(value);
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_STACK, SYM_EVENT_ID_CONST, 1, value);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (local_adapter) {
+                PyObject *symbolic = local_adapter->load_const(local_adapter->handler_param, TOP());
+                if (!symbolic) goto error;
+                TOP() = wrap(TOP(), symbolic, local_adapter);
+            }
             DISPATCH();
         }
 
@@ -2427,21 +2423,19 @@ handle_eval_breaker:
         }
 
         TARGET(LIST_APPEND) {  // REQUIRES UNWRAPPED
-            PyObject *symbolic_result = Py_None;
-            SymbolicAdapter *adapter_loc = 0;
-            if (is_wrapped(PEEK(oparg + 1))) {
-                adapter_loc = get_adapter(PEEK(oparg + 1));
-                PyObject *args[] = {get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP())};
-                symbolic_result = make_call_symbolic_handler(adapter_loc, SYM_EVENT_TYPE_METHOD, SYM_EVENT_ID_LIST_APPEND, 2, args);
-                if (!symbolic_result) symbolic_result = Py_None;
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = Py_None;
+            if (local_adapter) {
+                symbolic = local_adapter->list_append(local_adapter->handler_param, get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP()));
+                if (!symbolic) goto error;
             }
             TOUCH_STACK(oparg + 1, -1);
             PyObject *v = POP();
             PyObject *list = PEEK(oparg);
             if (_PyList_AppendTakeRef((PyListObject *)list, v) < 0)
                 goto error;
-            if (adapter_loc) {
-                PEEK(oparg) = wrap(PEEK(oparg), symbolic_result, adapter_loc);
+            if (local_adapter) {
+                PEEK(oparg) = wrap(PEEK(oparg), symbolic, local_adapter);
             }
             PREDICT(JUMP_BACKWARD_QUICK);
             DISPATCH();
@@ -3453,12 +3447,18 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_LIST) {  // REQUIRES UNWRAPPED
-            PyObject *args[256];  // TODO: check
-            for (int i = 1; i <= oparg; i++) {
-                Py_XINCREF(get_symbolic(stack_pointer[-i]));
-                args[oparg - i] = get_symbolic(stack_pointer[-i]);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = 0;
+            if (local_adapter) {
+                PyObject *args[257];
+                for (int i = 1; i <= oparg; i++) {
+                    Py_XINCREF(get_symbolic(stack_pointer[-i]));
+                    args[oparg - i] = get_symbolic(stack_pointer[-i]);
+                }
+                args[oparg] = 0;
+                symbolic = local_adapter->create_list(local_adapter->handler_param, args);
+                if (!symbolic) goto error;
             }
-            CALL_SYMBOLIC_HANDLER_ARRAY(SYM_EVENT_TYPE_STACK, SYM_EVENT_ID_CREATE_LIST, oparg, args);
             TOUCH_STACK(oparg, -1);
             PyObject *list =  PyList_New(oparg);
             if (list == NULL)
@@ -3468,6 +3468,8 @@ handle_eval_breaker:
                 PyList_SET_ITEM(list, oparg, item);
             }
             PUSH(list);
+            if (local_adapter)
+                TOP() = wrap(TOP(), symbolic, local_adapter);
             DISPATCH();
         }
 
@@ -3484,13 +3486,11 @@ handle_eval_breaker:
         }
 
         TARGET(LIST_EXTEND) {  // REQUIRES UNWRAPPED
-            PyObject *symbolic_result = Py_None;
-            SymbolicAdapter *adapter_loc = 0;
-            if (is_wrapped(PEEK(oparg + 1))) {
-                adapter_loc = get_adapter(PEEK(oparg + 1));
-                PyObject *args[] = {get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP())};
-                symbolic_result = make_call_symbolic_handler(adapter_loc, SYM_EVENT_TYPE_METHOD, SYM_EVENT_ID_LIST_EXTEND, 2, args);
-                if (!symbolic_result) symbolic_result = Py_None;
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = Py_None;
+            if (local_adapter) {
+                symbolic = local_adapter->list_extend(local_adapter->handler_param, get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP()));
+                if (!symbolic) goto error;
             }
             TOUCH_STACK(oparg + 1, -1);
             PyObject *iterable = POP();
@@ -3508,8 +3508,8 @@ handle_eval_breaker:
                 Py_DECREF(iterable);
                 goto error;
             }
-            if (adapter_loc)
-                PEEK(oparg) = wrap(PEEK(oparg), symbolic_result, adapter_loc);
+            if (local_adapter)
+                PEEK(oparg) = wrap(PEEK(oparg), symbolic, local_adapter);
             Py_DECREF(none_val);
             Py_DECREF(iterable);
             DISPATCH();
@@ -4252,22 +4252,17 @@ handle_eval_breaker:
             TOUCH_STACK(0, -1);
             PREDICTED(POP_JUMP_BACKWARD_IF_FALSE);
             PyObject *cond = POP();
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK, 1, get_symbolic_or_none(cond));
             if (Py_IsTrue(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_True);
                 DISPATCH();
             }
             if (Py_IsFalse(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
                 JUMPBY(-oparg);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_False);
                 CHECK_EVAL_BREAKER();
                 DISPATCH();
             }
             int err = PyObject_IsTrue(cond);
-            if (err >= 0)
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             Py_DECREF(cond);
             if (err > 0)
                 ;
@@ -4284,20 +4279,15 @@ handle_eval_breaker:
             TOUCH_STACK(0, -1);
             PREDICTED(POP_JUMP_FORWARD_IF_FALSE);
             PyObject *cond = POP();
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK, 1, get_symbolic_or_none(cond));
             if (Py_IsTrue(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_True);
             }
             else if (Py_IsFalse(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_False);
                 JUMPBY(oparg);
             }
             else {
                 int err = PyObject_IsTrue(cond);
-                if (err >= 0)
-                    CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
                 Py_DECREF(cond);
                 if (err > 0)
                     ;
@@ -4313,22 +4303,17 @@ handle_eval_breaker:
         TARGET(POP_JUMP_BACKWARD_IF_TRUE) {  // API
             TOUCH_STACK(0, -1);
             PyObject *cond = POP();
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK, 1, get_symbolic_or_none(cond));
             if (Py_IsFalse(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_False);
                 DISPATCH();
             }
             if (Py_IsTrue(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_True);
                 JUMPBY(-oparg);
                 CHECK_EVAL_BREAKER();
                 DISPATCH();
             }
             int err = PyObject_IsTrue(cond);
-            if (err >= 0)
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             Py_DECREF(cond);
             if (err > 0) {
                 JUMPBY(-oparg);
@@ -4344,20 +4329,15 @@ handle_eval_breaker:
         TARGET(POP_JUMP_FORWARD_IF_TRUE) {  // API
             TOUCH_STACK(0, -1);
             PyObject *cond = POP();
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK, 1, get_symbolic_or_none(cond));
             if (Py_IsFalse(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_False);
             }
             else if (Py_IsTrue(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_True);
                 JUMPBY(oparg);
             }
             else {
                 int err = PyObject_IsTrue(cond);
-                if (err >= 0)
-                    CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
                 Py_DECREF(cond);
                 if (err > 0) {
                     JUMPBY(oparg);
@@ -4423,22 +4403,17 @@ handle_eval_breaker:
         TARGET(JUMP_IF_FALSE_OR_POP) {  // API
             TOUCH_STACK(0, -1);
             PyObject *cond = TOP();
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK, 1, get_symbolic_or_none(cond));
             int err;
             if (Py_IsTrue(cond)) {
                 STACK_SHRINK(1);
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_True);
                 DISPATCH();
             }
             if (Py_IsFalse(cond)) {
                 JUMPBY(oparg);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_False);
                 DISPATCH();
             }
             err = PyObject_IsTrue(cond);
-            if (err >= 0)
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             if (err > 0) {
                 STACK_SHRINK(1);
                 Py_DECREF(cond);
@@ -4453,22 +4428,17 @@ handle_eval_breaker:
         TARGET(JUMP_IF_TRUE_OR_POP) {  // API
             TOUCH_STACK(0, -1);
             PyObject *cond = TOP();
-            CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK, 1, get_symbolic_or_none(cond));
             int err;
             if (Py_IsFalse(cond)) {
                 STACK_SHRINK(1);
                 _Py_DECREF_NO_DEALLOC(cond);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_True);
                 DISPATCH();
             }
             if (Py_IsTrue(cond)) {
                 JUMPBY(oparg);
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, Py_False);
                 DISPATCH();
             }
             err = PyObject_IsTrue(cond);
-            if (err >= 0)
-                CALL_SYMBOLIC_HANDLER(SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_FORK_RESULT, 1, err ? Py_True : Py_False);
             if (err > 0) {
                 JUMPBY(oparg);
             }

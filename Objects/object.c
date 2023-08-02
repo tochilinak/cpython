@@ -18,6 +18,8 @@
 #include "pycore_unionobject.h"   // _PyUnion_Type
 #include "pycore_interpreteridobject.h"  // _PyInterpreterID_Type
 
+#include "symbolicadapter.h"
+
 #ifdef Py_LIMITED_API
    // Prevent recursive call _Py_IncRef() <=> Py_INCREF()
 #  error "Py_LIMITED_API macro must not be defined"
@@ -1503,7 +1505,15 @@ PyObject_IsTrue(PyObject *v)
         return 0;
     if (v == Py_None)
         return 0;
-    else if (Py_TYPE(v)->tp_as_number != NULL &&
+
+    Py_INCREF(v);
+    if (is_wrapped(v)) {
+        SymbolicAdapter *adapter = get_adapter(v);
+        if (adapter->fork_notify(adapter->handler_param, get_symbolic_or_none(v)))
+            return -1;
+    }
+
+    if (Py_TYPE(v)->tp_as_number != NULL &&
              Py_TYPE(v)->tp_as_number->nb_bool != NULL)
         res = (*Py_TYPE(v)->tp_as_number->nb_bool)(v);
     else if (Py_TYPE(v)->tp_as_mapping != NULL &&
@@ -1513,7 +1523,16 @@ PyObject_IsTrue(PyObject *v)
              Py_TYPE(v)->tp_as_sequence->sq_length != NULL)
         res = (*Py_TYPE(v)->tp_as_sequence->sq_length)(v);
     else
-        return 1;
+        res = 1;
+
+    //printf("HERE (PyObject_True)! %p %ld\n", v, Py_REFCNT(v)); fflush(stdout);
+    if (is_wrapped(v) && res >= 0) {
+        SymbolicAdapter *adapter = get_adapter(v);
+        if (adapter->fork_result(adapter->handler_param, res > 0))
+            return -1;
+    }
+    Py_DECREF(v);
+
     /* if it is negative, it should be either -1 or -2 */
     return (res > 0) ? 1 : Py_SAFE_DOWNCAST(res, Py_ssize_t, int);
 }

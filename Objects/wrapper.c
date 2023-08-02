@@ -36,6 +36,8 @@ get_symbolic_or_none(PyObject *obj) {
 
 static void
 tp_dealloc(PyObject *op) {
+    //printf("DELETING: %p\n", op);
+    //fflush(stdout);
     Wrapper *wrapper = (Wrapper*) op;
     Py_XDECREF(wrapper->concrete);
     Py_XDECREF(wrapper->symbolic);
@@ -120,19 +122,19 @@ tp_str(PyObject *self) {
 }
 SLOT(tp_str)
 
-static int
-tp_richcompare_event_id_getter(richcmpfunc fun, int op) {
+static binary_handler
+tp_richcompare_handler_getter(SymbolicAdapter *adapter, richcmpfunc fun, int op) {
     if (fun == PyLong_Type.tp_richcompare) {
-        if (op == Py_GT) return SYM_EVENT_ID_INT_GT;
-        if (op == Py_LT) return SYM_EVENT_ID_INT_LT;
-        if (op == Py_EQ) return SYM_EVENT_ID_INT_EQ;
-        if (op == Py_NE) return SYM_EVENT_ID_INT_NE;
-        if (op == Py_GE) return SYM_EVENT_ID_INT_GE;
-        if (op == Py_LE) return SYM_EVENT_ID_INT_LE;
-    } else if (fun == virtual_tp_richcompare) {
-        return SYM_EVENT_ID_VIRTUAL_RICHCMP;
+        if (op == Py_GT) return adapter->gt_long;
+        if (op == Py_LT) return adapter->lt_long;
+        if (op == Py_EQ) return adapter->eq_long;
+        if (op == Py_NE) return adapter->ne_long;
+        if (op == Py_GE) return adapter->ge_long;
+        if (op == Py_LE) return adapter->le_long;
+    } else if (fun == adapter->virtual_tp_richcompare) {
+        return adapter->symbolic_virtual_binary_fun;
     }
-    return -1;
+    return adapter->default_binary_handler;
 }
 
 static PyObject *
@@ -147,14 +149,13 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
     SymbolicAdapter *adapter = get_adapter(self);
     PyObject *symbolic_self = get_symbolic_or_none(self);
     PyObject *symbolic_other = get_symbolic_or_none(other);
-    PyObject *args[] = {symbolic_self, symbolic_other, PyLong_FromLong(op)};
-    make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_TP_RICHCMP, 3, args);
+    if (adapter->tp_richcompare(adapter->handler_param, op, symbolic_self, symbolic_other) != 0)
+        return 0;
 
     PyObject *concrete_result = concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op);
-    int event_id = tp_richcompare_event_id_getter(concrete_self->ob_type->tp_richcompare, op);
     PyObject *symbolic = Py_None;
-    if (event_id != -1 && concrete_result != Py_NotImplemented) {
-        symbolic = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 2, args);
+    if (concrete_result != Py_NotImplemented) {
+        symbolic = tp_richcompare_handler_getter(adapter, concrete_self->ob_type->tp_richcompare, op)(adapter->handler_param, symbolic_self, symbolic_other);
         if (!symbolic) return 0;
     }
     return wrap(concrete_result, symbolic, adapter);
@@ -171,8 +172,8 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         if (res != 0)
             return 0;
 
-        PyObject *args[] = { concrete_self };
-        make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args);
+        // PyObject *args[] = { concrete_self };
+        // make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args);
         return Py_TYPE(concrete_self)->tp_call(concrete_self, o1, o2);
     }
 
@@ -282,7 +283,7 @@ SLOT(tp_hash)
                                         return concrete_self->ob_type->tp_as_number->func(concrete_self); \
                                     }
 
-#define UNARY_FUN_AS(func, tp_as, event_id_getter) \
+#define UNARY_FUN_AS(func, tp_as, handler_getter) \
                                     static PyObject * \
                                     func(PyObject *self) \
                                     { \
@@ -298,25 +299,22 @@ SLOT(tp_hash)
                                              return 0; \
                                         } \
                                         PyObject *concrete_result = concrete_self->ob_type->tp_as->func(concrete_self); \
-                                        int event_id = event_id_getter(concrete_self->ob_type->tp_as->func); \
                                         PyObject *symbolic = Py_None; \
-                                        PyObject *args[] = {get_symbolic_or_none(self)}; \
-                                        if (event_id != -1 && concrete_result != Py_NotImplemented) \
-                                            symbolic = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 1, args); \
+                                        if (concrete_result != Py_NotImplemented) \
+                                            symbolic = handler_getter(adapter, concrete_self->ob_type->tp_as->func)(adapter->handler_param, get_symbolic_or_none(self)); \
                                         if (!symbolic) return 0; \
                                         return wrap(concrete_result, symbolic, adapter); \
                                     }
 
-#define BINARY_FUN_AS(func, tp_as, event_id_getter, notify_id) \
+#define BINARY_FUN_AS(func, tp_as, handler_getter) \
                                     static PyObject * \
                                     func(PyObject *self, PyObject *other) \
                                     { \
-                                        PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(other)}; \
                                         SymbolicAdapter *adapter = get_adapter(self); \
                                         if (!adapter) \
                                             adapter = get_adapter(other); \
-                                        if (notify_id != -1) \
-                                            make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, notify_id, 2, args); \
+                                        assert(adapter != 0);             \
+                                        adapter->func(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other)); \
                                         PyObject *concrete_self = unwrap(self); \
                                         PyObject *concrete_other = unwrap(other); \
                                         PyObject *result = Py_NotImplemented; \
@@ -336,15 +334,14 @@ SLOT(tp_hash)
                                             } \
                                         } \
                                         PyObject *symbolic = Py_None;      \
-                                        int event_id = event_id_getter(result_fun); \
-                                        if (event_id != -1 && result != Py_NotImplemented) {             \
-                                            symbolic = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 2, args); \
+                                        if (result != Py_NotImplemented) {             \
+                                            symbolic = handler_getter(adapter, result_fun)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other)); \
                                             if (!symbolic) return 0; \
                                         }\
                                         return wrap(result, symbolic, adapter); \
                                     }
 
-#define TERNARY_FUN_AS(func, tp_as, event_id_getter) \
+#define TERNARY_FUN_AS(func, tp_as, handler_getter) \
                                     static PyObject * \
                                     func(PyObject *self, PyObject *o1, PyObject *o2) \
                                     { \
@@ -357,11 +354,11 @@ SLOT(tp_hash)
                                         ternaryfunc fun = 0; \
                                         if (concrete_self->ob_type->tp_as && concrete_self->ob_type->tp_as->func) \
                                             fun = concrete_self->ob_type->tp_as->func; \
-                                        int event_id = -1; \
+                                        ternaryfunc result_func = fun; \
                                         for (int i = 0; i <= 1; i++) { \
                                             if (fun) { \
                                                 result = fun(concrete_self, concrete_o1, concrete_o2); \
-                                                event_id = event_id_getter(fun); \
+                                                result_func = fun; \
                                             } \
                                             if (result != Py_NotImplemented) \
                                                 break; \
@@ -370,9 +367,8 @@ SLOT(tp_hash)
                                             } \
                                         } \
                                         PyObject *symbolic = Py_None; \
-                                        if (event_id != -1 && result != Py_NotImplemented) { \
-                                            PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)}; \
-                                            symbolic = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 3, args); \
+                                        if (result != Py_NotImplemented) { \
+                                            symbolic = handler_getter(adapter, result_func)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)); \
                                             if (!symbolic) return 0; \
                                         }\
                                         return wrap(result, symbolic, adapter); \
@@ -428,7 +424,7 @@ SLOT(tp_hash)
                                         return concrete_self->ob_type->tp_as->func(concrete_self, i, concrete_other); \
                                     }
 
-#define OBJOBJARG_AS(func, tp_as, event_id_getter) \
+#define OBJOBJARG_AS(func, tp_as, handler_getter) \
                                     static int \
                                     func(PyObject *self, PyObject *o1, PyObject *o2) \
                                     { \
@@ -444,12 +440,10 @@ SLOT(tp_hash)
                                             PyErr_SetString(PyExc_TypeError, "no func"); \
                                             return 0; \
                                         } \
-                                        int event_id = event_id_getter(concrete_self->ob_type->tp_as->func); \
                                         SymbolicAdapter *adapter = get_adapter(self); \
-                                        if (event_id != -1 && adapter) { \
-                                            PyObject *args[] = {get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)}; \
-                                            PyObject *res = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, event_id, 3, args); \
-                                            if (res != 0 && res != Py_None) return -1; \
+                                        if (adapter) { \
+                                            int res = handler_getter(adapter, concrete_self->ob_type->tp_as->func)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)); \
+                                            if (res != 0) return -1; \
                                         } \
                                         return concrete_self->ob_type->tp_as->func(concrete_self, concrete_o1, concrete_o2); \
                                     }
@@ -471,80 +465,113 @@ SLOT(tp_hash)
                                         return concrete_self->ob_type->tp_as->func(concrete_self, concrete_other); \
                                     }
 
-static int default_event_id_getter(void *func) {
-    return -1;
+static unary_handler
+default_unary_handler_getter(SymbolicAdapter *adapter, void *func) {
+    return adapter->default_unary_handler;
 }
 
-static int get_nb_add_event_id(binaryfunc func) {
-    if (func == PyLong_Type.tp_as_number->nb_add)
-        return SYM_EVENT_ID_INT_ADD;
-    return -1;
+static binary_handler
+default_binary_handler_getter(SymbolicAdapter *adapter, void *func) {
+    return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_event_id, -1)
+
+static ternary_handler
+default_ternary_handler_getter(SymbolicAdapter *adapter, void *func) {
+    return adapter->default_ternary_handler;
+}
+
+static binary_handler
+get_nb_add_handler(SymbolicAdapter *adapter, binaryfunc func) {
+    if (func == PyLong_Type.tp_as_number->nb_add)
+        return adapter->add_long;
+    return adapter->default_binary_handler;
+}
+BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_handler)
 SLOT(nb_add)
 
-static int get_nb_sub_event_id(binaryfunc func) {
+static binary_handler
+get_nb_sub_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_subtract)
-        return SYM_EVENT_ID_INT_SUB;
-    return -1;
+        return adapter->sub_long;
+    return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_event_id, -1)
+BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_handler)
 SLOT(nb_subtract)
 
-static int get_nb_mult_event_id(binaryfunc func) {
+static binary_handler
+get_nb_mult_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_multiply)
-        return SYM_EVENT_ID_INT_MULT;
-    return -1;
+        return adapter->mul_long;
+    return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_event_id, -1)
+BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_handler)
 SLOT(nb_multiply)
 
-static int get_nb_rem_event_id(binaryfunc func) {
+static binary_handler
+get_nb_rem_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_remainder)
-        return SYM_EVENT_ID_INT_REM;
-    return -1;
+        return adapter->rem_long;
+    return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_remainder, tp_as_number, get_nb_rem_event_id, -1)
+BINARY_FUN_AS(nb_remainder, tp_as_number, get_nb_rem_handler)
 SLOT(nb_remainder)
 
-BINARY_FUN_AS(nb_divmod, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_divmod, tp_as_number, default_binary_handler_getter)
 SLOT(nb_divmod)
 
-static int get_nb_power_event_id(ternaryfunc func) {
+static ternary_handler
+get_nb_power_handler(SymbolicAdapter *adapter, ternaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_power)
-        return SYM_EVENT_ID_INT_POW;
-    return -1;
+        return adapter->pow_long;
+    return adapter->default_ternary_handler;
 }
-TERNARY_FUN_AS(nb_power, tp_as_number, get_nb_power_event_id)
+TERNARY_FUN_AS(nb_power, tp_as_number, get_nb_power_handler)
 SLOT(nb_power)
 
-static int get_nb_neg_event_id(unaryfunc func) {
-    if (func == PyLong_Type.tp_as_number->nb_negative)
-        return SYM_EVENT_ID_INT_NEG;
-    return -1;
+static unary_handler
+get_nb_neg_handler(SymbolicAdapter *adapter, unaryfunc func) {
+    //if (func == PyLong_Type.tp_as_number->nb_negative)
+    //    return TODO;
+    return adapter->default_unary_handler;
 }
-UNARY_FUN_AS(nb_negative, tp_as_number, get_nb_neg_event_id)
+UNARY_FUN_AS(nb_negative, tp_as_number, get_nb_neg_handler)
 SLOT(nb_negative)
 
-UNARY_FUN_AS(nb_positive, tp_as_number, default_event_id_getter)
+UNARY_FUN_AS(nb_positive, tp_as_number, default_unary_handler_getter)
 SLOT(nb_positive)
 
-UNARY_FUN_AS(nb_absolute, tp_as_number, default_event_id_getter)
+UNARY_FUN_AS(nb_absolute, tp_as_number, default_unary_handler_getter)
 SLOT(nb_absolute)
-INQUIRY_NUMBER(nb_bool, SYM_EVENT_ID_NB_BOOL)
+
+int nb_bool(PyObject *self) {
+    PyObject *concrete_self = unwrap(self);
+    if (concrete_self->ob_type->tp_as_number == 0) {
+        PyErr_SetString(PyExc_TypeError, "no number");
+        return 0;
+    }
+    if (concrete_self->ob_type->tp_as_number->nb_bool == 0) {
+        PyErr_SetString(PyExc_TypeError, "no func");
+        return 0;
+    }
+    SymbolicAdapter *adapter = get_adapter(self);
+    PyObject *symbolic_self = get_symbolic_or_none(self);
+    if (adapter->nb_bool(adapter->handler_param, symbolic_self))
+        return -1;
+    return concrete_self->ob_type->tp_as_number->nb_bool(concrete_self);
+}
 SLOT(nb_bool)
 
-UNARY_FUN_AS(nb_invert, tp_as_number, default_event_id_getter)
+UNARY_FUN_AS(nb_invert, tp_as_number, default_unary_handler_getter)
 SLOT(nb_invert)
-BINARY_FUN_AS(nb_lshift, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_lshift, tp_as_number, default_binary_handler_getter)
 SLOT(nb_lshift)
-BINARY_FUN_AS(nb_rshift, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_rshift, tp_as_number, default_binary_handler_getter)
 SLOT(nb_rshift)
-BINARY_FUN_AS(nb_and, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_and, tp_as_number, default_binary_handler_getter)
 SLOT(nb_and)
-BINARY_FUN_AS(nb_xor, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_xor, tp_as_number, default_binary_handler_getter)
 SLOT(nb_xor)
-BINARY_FUN_AS(nb_or, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_or, tp_as_number, default_binary_handler_getter)
 SLOT(nb_or)
 
 // must return int
@@ -560,9 +587,7 @@ static PyObject *nb_int(PyObject *self) {
     }
     SymbolicAdapter *adapter = get_adapter(self);
     PyObject *symbolic_self = get_symbolic_or_none(self);
-    PyObject *args[] = {symbolic_self};
-    PyObject *res = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_NB_INT, 1, args);
-    if (res != 0 && res != Py_None)
+    if (adapter->nb_int(adapter->handler_param, symbolic_self))
         return 0;
     return concrete_self->ob_type->tp_as_number->nb_int(concrete_self);
 }
@@ -584,40 +609,41 @@ nb_float(PyObject *self) {
 }
 SLOT(nb_float)
 
-BINARY_FUN_AS(nb_inplace_add, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_add, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_add)
-BINARY_FUN_AS(nb_inplace_subtract, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_subtract, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_subtract)
-BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_multiply)
-BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_remainder)
-TERNARY_FUN_AS(nb_inplace_power, tp_as_number, default_event_id_getter)
+TERNARY_FUN_AS(nb_inplace_power, tp_as_number, default_ternary_handler_getter)
 SLOT(nb_inplace_power)
-BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_lshift)
-BINARY_FUN_AS(nb_inplace_rshift, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_rshift, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_rshift)
-BINARY_FUN_AS(nb_inplace_and, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_and, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_and)
-BINARY_FUN_AS(nb_inplace_xor, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_xor, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_xor)
-BINARY_FUN_AS(nb_inplace_or, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_or, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_or)
 
-static int get_nb_floor_div_event_id(binaryfunc func) {
+static binary_handler
+get_nb_floor_div_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_floor_divide)
-        return SYM_EVENT_ID_INT_FLOORDIV;
-    return -1;
+        return adapter->div_long;
+    return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_event_id, -1)
+BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_handler)
 SLOT(nb_floor_divide)
 
-BINARY_FUN_AS(nb_true_divide, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_true_divide, tp_as_number, default_binary_handler_getter)
 SLOT(nb_true_divide)
-BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_floor_divide)
-BINARY_FUN_AS(nb_inplace_true_divide, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_true_divide, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_true_divide)
 
 // must return integer
@@ -636,14 +662,14 @@ nb_index(PyObject *self) {
 }
 SLOT(nb_index)
 
-BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, default_binary_handler_getter)
 SLOT(nb_matrix_multiply)
-BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_event_id_getter, -1)
+BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_matrix_multiply)
 
 LEN_FUN_AS(sq_length, tp_as_sequence)
 SLOT(sq_length)
-BINARY_FUN_AS(sq_concat, tp_as_sequence, default_event_id_getter, -1)
+BINARY_FUN_AS(sq_concat, tp_as_sequence, default_binary_handler_getter)
 SLOT(sq_concat)
 
 SIZEARG_FUN_AS(sq_repeat, tp_as_sequence)
@@ -663,7 +689,7 @@ SIZEOBJARG_AS(sq_ass_item, tp_as_sequence)
 SLOT(sq_ass_item)
 OBJOBJ_AS(sq_contains, tp_as_sequence)
 SLOT(sq_contains)
-BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, default_event_id_getter, -1)
+BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, default_binary_handler_getter)
 SLOT(sq_inplace_concat)
 
 SIZEARG_FUN_AS(sq_inplace_repeat, tp_as_sequence)
@@ -672,21 +698,24 @@ SLOT(sq_inplace_repeat)
 LEN_FUN_AS(mp_length, tp_as_mapping)
 SLOT(mp_length)
 
-static int get_mp_subscript_event_id(binaryfunc func) {
+static binary_handler
+get_mp_subscript_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyList_Type.tp_as_mapping->mp_subscript)
-        return SYM_EVENT_ID_LIST_GET_ITEM;
-    if (func == virtual_mp_subscript)
-        return SYM_EVENT_ID_VIRTUAL_MP_SUBSCRIPT;
-    return -1;
+        return adapter->list_get_item;
+    if (func == adapter->virtual_mp_subscript)
+        return adapter->symbolic_virtual_binary_fun;
+    return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_event_id, SYM_EVENT_ID_MP_SUBSCRIPT)
+BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_handler)
 SLOT(mp_subscript)
-static int get_mp_ass_subscript_event_id(objobjargproc func) {
+
+static ternary_notify
+get_mp_ass_subscript_handler(SymbolicAdapter *adapter, objobjargproc func) {
     if (func == PyList_Type.tp_as_mapping->mp_ass_subscript)
-        return SYM_EVENT_ID_LIST_SET_ITEM;
-    return -1;
+        return adapter->list_set_item;
+    return adapter->default_ternary_notify;
 }
-OBJOBJARG_AS(mp_ass_subscript, tp_as_mapping, get_mp_ass_subscript_event_id)
+OBJOBJARG_AS(mp_ass_subscript, tp_as_mapping, get_mp_ass_subscript_handler)
 SLOT(mp_ass_subscript)
 
 PyType_Slot final_slot = {0, NULL};
@@ -850,7 +879,8 @@ wrap(PyObject *obj, PyObject *symbolic, SymbolicAdapter *adapter) {
     result->concrete = obj;
     result->symbolic = symbolic;
     result->adapter = adapter;
-    //printf("created %p; type: %p\n", result, Py_TYPE(result));
+    //printf("CREATED %p for %p\n", result, symbolic);
+    //fflush(stdout);
     return (PyObject *) result;
 }
 

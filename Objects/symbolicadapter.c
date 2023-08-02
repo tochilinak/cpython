@@ -13,23 +13,15 @@ adapter_dealloc(PyObject *op) {
 static int
 trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) obj;
-
-    if (!adapter->inside_handler) {
-        frame->f_trace_opcodes = 1;
-    } else {
-        frame->f_trace_opcodes = 0;
-    }
-
-    PyObject *result = 0;
-
+    int result = 0;
+    frame->f_trace_opcodes = 1;
     if (what == PyTrace_OPCODE && !adapter->ignore) {
-        PyObject *args[] = {(PyObject *) frame};
-        result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_INSTRUCTION, 1, args);
+        result = adapter->instruction(adapter->handler_param, frame);
     } else if (what == PyTrace_RETURN && !adapter->ignore) {
-        result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_RETURN, 0, 0);
+        // result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_RETURN, 0, 0);
     }
 
-    return !(result == Py_None || result == 0);
+    return result;
 }
 
 int
@@ -92,10 +84,9 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
         return 0;
     }
 
-    PyObject *args_for_handler[] = { function };
-    make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args_for_handler);
+    // PyObject *args_for_handler[] = { function };
+    // make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args_for_handler);
     PyObject *result = Py_TYPE(function)->tp_call(function, wrappers, 0);
-    // printf("result: %p %p %p\n", result, PyErr_Occurred(), PyCell_Get(cell));
 
     gil = PyGILState_Ensure();
     PyEval_SetTrace(0, 0);
@@ -168,36 +159,94 @@ PyTypeObject SymbolicAdapter_Type = {
     PyObject_Free,                              /* tp_free */
 };
 
+static int default_instruction(void *arg, PyFrameObject *frame) { return 0; }
+static PyObject *default_create_list(void *arg, PyObject **elems) { Py_RETURN_NONE; }
+static int default_unary_notify(void *arg, PyObject *on) { return 0; }
+static int default_binary_notify(void *arg, PyObject *first, PyObject *second) { return 0; }
+static int default_ternary_notify(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { return 0; }
+static int default_fork_result(void *arg, int result) { return 0; }
+static int default_tp_richcompare(void *arg, int op, PyObject *first, PyObject *second) { return 0; }
+static PyObject *default_unary(void *arg, PyObject *o) { Py_RETURN_NONE; }
+static PyObject *default_binary(void *arg, PyObject *left, PyObject *right) { Py_RETURN_NONE; }
+static PyObject *default_ternary(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { Py_RETURN_NONE; }
+static int default_set_item(void *arg, PyObject *storage, PyObject *index, PyObject *value) { return 0; }
+
 static SymbolicAdapter *
-create_new_adapter_(symbolic_handler_callable handler, PyObject *ready_wrapper_types, void *handler_param) {
+create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     SymbolicAdapter *result = PyObject_New(SymbolicAdapter, &SymbolicAdapter_Type);
     Py_INCREF(ready_wrapper_types);
-    result->handler = handler;
+    result->ignore = 0;
     result->handler_param = handler_param;
     result->ready_wrapper_types = ready_wrapper_types;
-    result->inside_handler = 0;
-    result->ignore = 0;
+    result->instruction = default_instruction;
+    result->fork_notify = default_unary_notify;
+    result->fork_result = default_fork_result;
+    result->load_const = default_unary;
+    result->create_list = default_create_list;
+    result->gt_long = default_binary;
+    result->lt_long = default_binary;
+    result->eq_long = default_binary;
+    result->ne_long = default_binary;
+    result->le_long = default_binary;
+    result->ge_long = default_binary;
+    result->add_long = default_binary;
+    result->sub_long = default_binary;
+    result->mul_long = default_binary;
+    result->div_long = default_binary;
+    result->rem_long = default_binary;
+    result->pow_long = default_ternary;
+    result->list_get_item = default_binary;
+    result->list_set_item = default_set_item;
+    result->list_extend = default_binary;
+    result->list_append = default_binary;
+    result->nb_add = default_binary_notify;
+    result->nb_subtract = default_binary_notify;
+    result->nb_multiply = default_binary_notify;
+    result->nb_remainder = default_binary_notify;
+    result->nb_divmod = default_binary_notify;
+    result->nb_bool = default_unary_notify;
+    result->nb_int = default_unary_notify;
+    result->nb_lshift = default_binary_notify;
+    result->nb_rshift = default_binary_notify;
+    result->nb_and = default_binary_notify;
+    result->nb_xor = default_binary_notify;
+    result->nb_or = default_binary_notify;
+    result->nb_inplace_add = default_binary_notify;
+    result->nb_inplace_subtract = default_binary_notify;
+    result->nb_inplace_multiply = default_binary_notify;
+    result->nb_inplace_remainder = default_binary_notify;
+    result->nb_inplace_lshift = default_binary_notify;
+    result->nb_inplace_rshift = default_binary_notify;
+    result->nb_inplace_and = default_binary_notify;
+    result->nb_inplace_xor = default_binary_notify;
+    result->nb_inplace_or = default_binary_notify;
+    result->nb_floor_divide = default_binary_notify;
+    result->nb_true_divide = default_binary_notify;
+    result->nb_inplace_floor_divide = default_binary_notify;
+    result->nb_inplace_true_divide = default_binary_notify;
+    result->nb_matrix_multiply = default_binary_notify;
+    result->nb_inplace_matrix_multiply = default_binary_notify;
+    result->sq_concat = default_binary_notify;
+    result->sq_inplace_concat = default_binary_notify;
+    result->mp_subscript = default_binary_notify;
+    result->tp_richcompare = default_tp_richcompare;
+    result->symbolic_virtual_binary_fun = default_binary;
+    result->virtual_tp_richcompare = 0;
+    result->virtual_mp_subscript = 0;
+    result->default_unary_handler = default_unary;
+    result->default_binary_handler = default_binary;
+    result->default_ternary_handler = default_ternary;
+    result->default_ternary_notify = default_ternary_notify;
     return result;
 }
 
 SymbolicAdapter *
-create_new_adapter(symbolic_handler_callable handler, void *param) {
+create_new_adapter(void *param) {
     PyObject *ready_wrapper_types = PyDict_New();
-    return create_new_adapter_(handler, ready_wrapper_types, param);
-}
-
-PyObject *
-make_call_symbolic_handler(SymbolicAdapter *adapter, int event_type, int event_id, int nargs, PyObject *const *args) {
-    adapter->inside_handler++;
-    PyObject *result = adapter->handler(event_type, event_id, nargs, args, adapter->handler_param);
-    adapter->inside_handler--;
-    return result;
+    return create_new_adapter_(ready_wrapper_types, param);
 }
 
 int
 SymbolicAdapter_CheckExact(PyObject *obj) {
     return Py_TYPE(obj) == &SymbolicAdapter_Type;
 }
-
-void *virtual_tp_richcompare = 0;
-void *virtual_mp_subscript = 0;
