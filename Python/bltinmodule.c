@@ -11,6 +11,8 @@
 #include "pycore_tuple.h"         // _PyTuple_FromArray()
 #include "pycore_ceval.h"         // _PyEval_Vector()
 
+#include "approximation_defs.h"
+
 #include "clinic/bltinmodule.c.h"
 #include "wrapper.h"
 #include "symbolicadapter.h"
@@ -1702,6 +1704,8 @@ builtin_len(PyObject *module, PyObject *obj)
     }
     return PyLong_FromSsize_t(res);
 }
+
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_LEN = builtin_len;
 
 
 /*[clinic input]

@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include "wrapper.h"
+#include "approximation_defs.h"
 
 #define SLOT(func)                  PyType_Slot Wrapper_##func = {Py_##func, func};
 
@@ -163,9 +164,26 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
 SLOT(tp_richcompare)
 
 static PyObject *
+approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdapter *adapter, int *called_approximation) {
+    *called_approximation = 0;
+    if (!PyCFunction_Check(original))
+        return 0;
+    void *c_method = ((PyCFunctionObject *) original)->m_ml->ml_meth;
+    if (c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_LEN && adapter->approximation_builtin_len) {
+        if (o2 || !PyTuple_Check(o1) || PyTuple_GET_SIZE(o1) != 1)
+            return 0;
+        PyObject *obj = PyTuple_GetItem(o1, 0);
+        *called_approximation = 1;
+        return adapter->approximation_builtin_len(obj);
+    }
+    return 0;
+}
+
+static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     PyObject *concrete_self = unwrap(self);
     SymbolicAdapter *adapter = get_adapter(self);
+    assert(adapter != 0);
 
     if (PyFunction_Check(concrete_self)) {
         int res = register_symbolic_tracing(concrete_self, adapter);
@@ -176,6 +194,11 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         // make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args);
         return Py_TYPE(concrete_self)->tp_call(concrete_self, o1, o2);
     }
+
+    int approximated = 0;
+    PyObject *r = approximate_tp_call(concrete_self, o1, o2, adapter, &approximated);
+    if (approximated)
+        return r;
 
     PyObject *concrete_o1 = 0;
     if (o1) {
@@ -484,6 +507,8 @@ static binary_handler
 get_nb_add_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_add)
         return adapter->add_long;
+    if (func == adapter->virtual_nb_add)
+        return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
 BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_handler)

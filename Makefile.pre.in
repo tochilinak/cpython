@@ -1483,6 +1483,7 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/boolobject.h \
 		$(srcdir)/Include/wrapper.h \
 		$(srcdir)/Include/symbolicadapter.h \
+		$(srcdir)/Include/approximation_defs.h \
 		$(srcdir)/Include/bytearrayobject.h \
 		$(srcdir)/Include/bytesobject.h \
 		$(srcdir)/Include/ceval.h \
