@@ -163,20 +163,6 @@ PyObject_GetItem(PyObject *o, PyObject *key)
     PySequenceMethods *ms = Py_TYPE(o)->tp_as_sequence;
     if (ms && ms->sq_item) {
         if (_PyIndex_Check(key)) {
-
-            /*
-            int event_id = get_sq_item_event_id(ms->sq_item);
-            PyObject *symbolic_result = Py_None;
-            SymbolicAdapter *adapter = get_adapter(o);
-            if (is_wrapped(o) && event_id != -1) {
-                PyObject *args[] = {get_symbolic_or_none(o), get_symbolic_or_none(key)};
-                symbolic_result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_METHOD, event_id, 2, args);
-                if (!symbolic_result) symbolic_result = Py_None;
-            }
-            if (adapter) {
-                return wrap(PySequence_GetItem(o, key_value), symbolic_result, adapter);
-            } */
-
             Py_ssize_t key_value;
             key_value = PyNumber_AsSsize_t(key, PyExc_IndexError);
             if (key_value == -1 && PyErr_Occurred())

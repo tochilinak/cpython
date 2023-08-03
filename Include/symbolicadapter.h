@@ -37,6 +37,8 @@ typedef struct {
     PyObject *(*list_extend)(void *, PyObject *list, PyObject *iterable);
     PyObject *(*list_append)(void *, PyObject *list, PyObject *elem);
     PyObject *(*list_get_size)(void *, PyObject *list);
+    PyObject *(*list_iter)(void *, PyObject *list);
+    PyObject *(*list_iterator_next)(void *, PyObject *iterator);
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
     int (*nb_add)(void *, PyObject *left, PyObject *right);
     int (*nb_subtract)(void *, PyObject *left, PyObject *right);
@@ -69,6 +71,8 @@ typedef struct {
     int (*sq_inplace_concat)(void *, PyObject *left, PyObject *right);
     int (*mp_subscript)(void *, PyObject *storage, PyObject *item);
     int (*tp_richcompare)(void *, int op, PyObject *left, PyObject *right);
+    int (*tp_iter)(void *, PyObject *);
+    int (*tp_iternext)(void *, PyObject *);
     PyObject *(*symbolic_virtual_binary_fun)(void *, PyObject *left, PyObject *right);
     void *virtual_tp_richcompare;
     void *virtual_nb_add;

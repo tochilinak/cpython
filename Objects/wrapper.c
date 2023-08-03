@@ -252,19 +252,39 @@ tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
 }
 SLOT(tp_setattro)
 
+static unary_handler
+get_tp_iter_handler(SymbolicAdapter *adapter, getiterfunc func) {
+    if (func == PyList_Type.tp_iter)
+        return adapter->list_iter;
+    return adapter->default_unary_handler;
+}
+
 PyObject *
 tp_iter(PyObject *self) {
     PyObject *concrete_self = unwrap(self);
-
     if (concrete_self->ob_type->tp_iter == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_iter");
         return 0;
     }
 
+    PyObject *symbolic_self = get_symbolic_or_none(self);
     SymbolicAdapter *adapter = get_adapter(self);
-    return wrap(concrete_self->ob_type->tp_iter(concrete_self), 0, adapter);
+    if (adapter->tp_iter(adapter->handler_param, symbolic_self))
+        return 0;
+    PyObject *symbolic_result = get_tp_iter_handler(adapter, concrete_self->ob_type->tp_iter)(adapter->handler_param, symbolic_self);
+    if (!symbolic_result)
+        return 0;
+
+    return wrap(concrete_self->ob_type->tp_iter(concrete_self), symbolic_result, adapter);
 }
 SLOT(tp_iter)
+
+static unary_handler
+get_tp_iternext_handler(SymbolicAdapter *adapter, iternextfunc func) {
+    if (func == PyListIter_Type.tp_iternext)
+        return adapter->list_iterator_next;
+    return adapter->default_unary_handler;
+}
 
 PyObject *
 tp_iternext(PyObject *self) {
@@ -273,8 +293,16 @@ tp_iternext(PyObject *self) {
         PyErr_SetString(PyExc_TypeError, "no tp_iternext");
         return 0;
     }
+    PyObject *symbolic_self = get_symbolic_or_none(self);
     SymbolicAdapter *adapter = get_adapter(self);
-    return wrap(concrete_self->ob_type->tp_iternext(concrete_self), 0, adapter);
+    if (adapter->tp_iternext(adapter->handler_param, symbolic_self))
+        return 0;
+    PyObject *concrete_result = concrete_self->ob_type->tp_iternext(concrete_self);  // this might be NULL (iterator ended) but we still should call symbolic part
+    PyObject *symbolic_result = get_tp_iternext_handler(adapter, concrete_self->ob_type->tp_iternext)(adapter->handler_param, symbolic_self);
+    if (!symbolic_result)
+        return 0;
+
+    return wrap(concrete_result, symbolic_result, adapter);
 }
 SLOT(tp_iternext)
 
@@ -344,7 +372,7 @@ SLOT(tp_hash)
                                         if (!adapter) \
                                             adapter = get_adapter(other); \
                                         assert(adapter != 0);             \
-                                        adapter->func(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other)); \
+                                        if (adapter->func(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other))) return 0; \
                                         PyObject *concrete_self = unwrap(self); \
                                         PyObject *concrete_other = unwrap(other); \
                                         PyObject *result = Py_NotImplemented; \

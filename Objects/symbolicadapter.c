@@ -200,6 +200,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->list_extend = default_binary;
     result->list_append = default_binary;
     result->list_get_size = default_unary;
+    result->list_iter = default_unary;
+    result->list_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
     result->nb_add = default_binary_notify;
     result->nb_subtract = default_binary_notify;
@@ -232,6 +234,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->sq_inplace_concat = default_binary_notify;
     result->mp_subscript = default_binary_notify;
     result->tp_richcompare = default_tp_richcompare;
+    result->tp_iter = default_unary_notify;
+    result->tp_iternext = default_unary_notify;
     result->symbolic_virtual_binary_fun = default_binary;
     result->virtual_tp_richcompare = 0;
     result->virtual_nb_add = 0;
