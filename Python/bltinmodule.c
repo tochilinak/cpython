@@ -14,8 +14,6 @@
 #include "approximation_defs.h"
 
 #include "clinic/bltinmodule.c.h"
-#include "wrapper.h"
-#include "symbolicadapter.h"
 
 static PyObject*
 update_bases(PyObject *bases, PyObject *const *args, Py_ssize_t nargs)

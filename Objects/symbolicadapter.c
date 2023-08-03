@@ -16,50 +16,13 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
     int result = 0;
     frame->f_trace_opcodes = 1;
     if (what == PyTrace_OPCODE && !adapter->ignore) {
+        //printf("INSTRUCTION ON CODE %ld\n", (long) PyFrame_GetCode(frame)); fflush(stdout);
         result = adapter->instruction(adapter->handler_param, frame);
     } else if (what == PyTrace_RETURN && !adapter->ignore) {
         // result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_RETURN, 0, 0);
     }
 
     return result;
-}
-
-int
-register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter) {
-    if (!PyFunction_Check(func)) {
-        char buf[1000];
-        sprintf(buf, "Wrong type of callable: %s", Py_TYPE(func)->tp_name);
-        PyErr_SetString(PyExc_TypeError, buf);
-        return 1;
-    }
-    PyObject *obj = PyFunction_GET_CODE(func);
-    if (!PyCode_Check(obj)) {
-        PyErr_SetString(PyExc_TypeError, "Wrong type of code object");
-        return 1;
-    }
-    PyCodeObject *code = (PyCodeObject *) obj;
-    if (!PyTuple_CheckExact(code->co_consts)) {
-        PyErr_SetString(PyExc_TypeError, "Wrong type of consts holder");
-        return 1;
-    }
-
-    PyTupleObject *consts = (PyTupleObject *) code->co_consts;
-    Py_ssize_t n_consts = PyTuple_GET_SIZE(consts);
-    PyObject *last = PyTuple_GetItem(code->co_consts, n_consts - 1);
-    if (last == (PyObject *) adapter)
-        return 0;
-
-    PyTupleObject *new_consts = (PyTupleObject *) PyTuple_New(n_consts + 1);
-    memcpy(new_consts->ob_item, consts->ob_item, n_consts * sizeof(PyObject *));
-    for (int i = 0; i < n_consts; i++)
-        Py_XINCREF(PyTuple_GET_ITEM(code->co_consts, i));
-    PyTuple_SET_ITEM(new_consts, n_consts, adapter);
-    Py_INCREF(adapter);
-
-    code->co_consts = (PyObject *) new_consts;
-    Py_DECREF(consts);
-
-    return 0;
 }
 
 PyObject *
@@ -195,6 +158,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->div_long = default_binary;
     result->rem_long = default_binary;
     result->pow_long = default_ternary;
+    result->bool_and = default_binary;
     result->list_get_item = default_binary;
     result->list_set_item = default_set_item;
     result->list_extend = default_binary;
@@ -244,6 +208,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->virtual_mp_subscript = 0;
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;
+    result->approximation_list_richcompare = 0;
     result->default_unary_handler = default_unary;
     result->default_binary_handler = default_binary;
     result->default_ternary_handler = default_ternary;
@@ -260,4 +225,46 @@ create_new_adapter(void *param) {
 int
 SymbolicAdapter_CheckExact(PyObject *obj) {
     return Py_TYPE(obj) == &SymbolicAdapter_Type;
+}
+
+int
+register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter) {
+    if (!PyFunction_Check(func)) {
+        char buf[1000];
+        sprintf(buf, "Wrong type of callable: %s", Py_TYPE(func)->tp_name);
+        PyErr_SetString(PyExc_TypeError, buf);
+        return 1;
+    }
+    PyObject *obj = PyFunction_GET_CODE(func);
+    if (!PyCode_Check(obj)) {
+        PyErr_SetString(PyExc_TypeError, "Wrong type of code object");
+        return 1;
+    }
+    PyCodeObject *code = (PyCodeObject *) obj;
+    if (!PyTuple_CheckExact(code->co_consts)) {
+        PyErr_SetString(PyExc_TypeError, "Wrong type of consts holder");
+        return 1;
+    }
+
+    PyTupleObject *consts = (PyTupleObject *) code->co_consts;
+    Py_ssize_t n_consts = PyTuple_GET_SIZE(consts);
+    PyObject *last = PyTuple_GetItem(code->co_consts, n_consts - 1);
+    if (last == (PyObject *) adapter)
+        return 0;
+    if (Py_TYPE(last) == &SymbolicAdapter_Type) {
+        PyTuple_SET_ITEM(code->co_consts, n_consts - 1, adapter);
+        return 0;
+    }
+
+    PyTupleObject *new_consts = (PyTupleObject *) PyTuple_New(n_consts + 1);
+    memcpy(new_consts->ob_item, consts->ob_item, n_consts * sizeof(PyObject *));
+    for (int i = 0; i < n_consts; i++)
+        Py_XINCREF(PyTuple_GET_ITEM(code->co_consts, i));
+    PyTuple_SET_ITEM(new_consts, n_consts, adapter);
+    Py_INCREF(adapter);
+
+    code->co_consts = (PyObject *) new_consts;
+    Py_DECREF(consts);
+
+    return 0;
 }

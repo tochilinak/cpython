@@ -123,6 +123,17 @@ tp_str(PyObject *self) {
 }
 SLOT(tp_str)
 
+static PyObject *
+approximate_tp_richcompare(SymbolicAdapter *adapter, PyObject *self, PyObject *other, int op, int *approximated) {
+    *approximated = 0;
+    PyObject *concrete_self = unwrap(self);
+    if (Py_TYPE(concrete_self)->tp_richcompare == PyList_Type.tp_richcompare && adapter->approximation_list_richcompare) {
+        *approximated = 1;
+        return adapter->approximation_list_richcompare(self, other, op);
+    }
+    return 0;
+}
+
 static binary_handler
 tp_richcompare_handler_getter(SymbolicAdapter *adapter, richcmpfunc fun, int op) {
     if (fun == PyLong_Type.tp_richcompare) {
@@ -148,6 +159,11 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
         return 0;
     }
     SymbolicAdapter *adapter = get_adapter(self);
+    int approximated;
+    PyObject *r = approximate_tp_richcompare(adapter, self, other, op, &approximated);
+    if (approximated)
+        return r;
+
     PyObject *symbolic_self = get_symbolic_or_none(self);
     PyObject *symbolic_other = get_symbolic_or_none(other);
     if (adapter->tp_richcompare(adapter->handler_param, op, symbolic_self, symbolic_other) != 0)

@@ -32,6 +32,7 @@ typedef struct {
     PyObject *(*div_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*rem_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*pow_long)(void *, PyObject *base, PyObject *pow, PyObject *mod);
+    PyObject *(*bool_and)(void *, PyObject *, PyObject *);
     PyObject *(*list_get_item)(void *, PyObject *storage, PyObject *index);
     int (*list_set_item)(void *, PyObject *storage, PyObject *index, PyObject *value);
     PyObject *(*list_extend)(void *, PyObject *list, PyObject *iterable);
@@ -81,6 +82,7 @@ typedef struct {
     void *virtual_mp_subscript;
     PyObject *(*approximation_builtin_len)(PyObject *);
     PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);
+    PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
     unary_handler default_unary_handler;
     binary_handler default_binary_handler;
     ternary_handler default_ternary_handler;
@@ -89,7 +91,7 @@ typedef struct {
 
 #include "wrapper.h"
 
-int register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter);
+PyAPI_FUNC(int) register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter);
 PyAPI_FUNC(SymbolicAdapter*) create_new_adapter(void *param);
 PyAPI_FUNC(PyObject*) SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args);
 PyObject *make_call_symbolic_handler(SymbolicAdapter *adapter, int event_type, int event_id, int nargs, PyObject *const *args);
