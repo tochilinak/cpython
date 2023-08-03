@@ -439,12 +439,15 @@ SLOT(tp_hash)
                                         PyObject *concrete_self = unwrap(self); \
                                         if (concrete_self->ob_type->tp_as == 0) { \
                                             PyErr_SetString(PyExc_TypeError, "no as"); \
-                                            return 0; \
+                                            return -1; \
                                         } \
                                         if (concrete_self->ob_type->tp_as->func == 0) { \
-                                             PyErr_SetString(PyExc_TypeError, "no func"); \
-                                             return 0; \
+                                            PyErr_SetString(PyExc_TypeError, "no func"); \
+                                            return -1; \
                                         } \
+                                        SymbolicAdapter *adapter = get_adapter(self); \
+                                        assert(adapter); \
+                                        if (adapter->sq_length(adapter->handler_param, get_symbolic_or_none(self))) return -1; \
                                         return concrete_self->ob_type->tp_as->func(concrete_self); \
                                     }
 

@@ -230,12 +230,14 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->nb_inplace_true_divide = default_binary_notify;
     result->nb_matrix_multiply = default_binary_notify;
     result->nb_inplace_matrix_multiply = default_binary_notify;
+    result->sq_length = default_unary_notify;
     result->sq_concat = default_binary_notify;
     result->sq_inplace_concat = default_binary_notify;
     result->mp_subscript = default_binary_notify;
     result->tp_richcompare = default_tp_richcompare;
     result->tp_iter = default_unary_notify;
     result->tp_iternext = default_unary_notify;
+    result->symbolic_virtual_unary_fun = default_unary;
     result->symbolic_virtual_binary_fun = default_binary;
     result->virtual_tp_richcompare = 0;
     result->virtual_nb_add = 0;

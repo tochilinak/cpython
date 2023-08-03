@@ -67,12 +67,14 @@ typedef struct {
     int (*nb_inplace_true_divide)(void *, PyObject *left, PyObject *right);
     int (*nb_matrix_multiply)(void *, PyObject *left, PyObject *right);
     int (*nb_inplace_matrix_multiply)(void *, PyObject *left, PyObject *right);
+    int (*sq_length)(void *, PyObject *);
     int (*sq_concat)(void *, PyObject *left, PyObject *right);
     int (*sq_inplace_concat)(void *, PyObject *left, PyObject *right);
     int (*mp_subscript)(void *, PyObject *storage, PyObject *item);
     int (*tp_richcompare)(void *, int op, PyObject *left, PyObject *right);
     int (*tp_iter)(void *, PyObject *);
     int (*tp_iternext)(void *, PyObject *);
+    PyObject *(*symbolic_virtual_unary_fun)(void *, PyObject *);
     PyObject *(*symbolic_virtual_binary_fun)(void *, PyObject *left, PyObject *right);
     void *virtual_tp_richcompare;
     void *virtual_nb_add;
