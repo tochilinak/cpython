@@ -127,7 +127,7 @@ static PyObject *default_create_list(void *arg, PyObject **elems) { Py_RETURN_NO
 static int default_unary_notify(void *arg, PyObject *on) { return 0; }
 static int default_binary_notify(void *arg, PyObject *first, PyObject *second) { return 0; }
 static int default_ternary_notify(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { return 0; }
-static int default_fork_result(void *arg, int result) { return 0; }
+static int default_fork_result(void *arg, PyObject *on, int result) { return 0; }
 static int default_tp_richcompare(void *arg, int op, PyObject *first, PyObject *second) { return 0; }
 static PyObject *default_unary(void *arg, PyObject *o) { Py_RETURN_NONE; }
 static PyObject *default_binary(void *arg, PyObject *left, PyObject *right) { Py_RETURN_NONE; }
@@ -198,12 +198,14 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->sq_concat = default_binary_notify;
     result->sq_inplace_concat = default_binary_notify;
     result->mp_subscript = default_binary_notify;
+    result->mp_ass_subscript = default_ternary_notify;
     result->tp_richcompare = default_tp_richcompare;
     result->tp_iter = default_unary_notify;
     result->tp_iternext = default_unary_notify;
     result->symbolic_virtual_unary_fun = default_unary;
     result->symbolic_virtual_binary_fun = default_binary;
     result->virtual_tp_richcompare = 0;
+    result->virtual_tp_iter = 0;
     result->virtual_nb_add = 0;
     result->virtual_mp_subscript = 0;
     result->approximation_builtin_len = 0;

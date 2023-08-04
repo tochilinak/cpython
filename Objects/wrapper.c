@@ -272,6 +272,8 @@ static unary_handler
 get_tp_iter_handler(SymbolicAdapter *adapter, getiterfunc func) {
     if (func == PyList_Type.tp_iter)
         return adapter->list_iter;
+    if (func == adapter->virtual_tp_iter)
+        return adapter->symbolic_virtual_unary_fun;
     return adapter->default_unary_handler;
 }
 
@@ -499,30 +501,6 @@ SLOT(tp_hash)
                                              return 0; \
                                         } \
                                         return concrete_self->ob_type->tp_as->func(concrete_self, i, concrete_other); \
-                                    }
-
-#define OBJOBJARG_AS(func, tp_as, handler_getter) \
-                                    static int \
-                                    func(PyObject *self, PyObject *o1, PyObject *o2) \
-                                    { \
-                                        /*printf("calling %s on %p\n", #func, self); fflush(stdout);*/ \
-                                        PyObject *concrete_self = unwrap(self); \
-                                        PyObject *concrete_o1 = unwrap(o1); \
-                                        PyObject *concrete_o2 = unwrap(o2); \
-                                        if (concrete_self->ob_type->tp_as == 0) { \
-                                            PyErr_SetString(PyExc_TypeError, "no as"); \
-                                            return 0; \
-                                        } \
-                                        if (concrete_self->ob_type->tp_as->func == 0) { \
-                                            PyErr_SetString(PyExc_TypeError, "no func"); \
-                                            return 0; \
-                                        } \
-                                        SymbolicAdapter *adapter = get_adapter(self); \
-                                        if (adapter) { \
-                                            int res = handler_getter(adapter, concrete_self->ob_type->tp_as->func)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)); \
-                                            if (res != 0) return -1; \
-                                        } \
-                                        return concrete_self->ob_type->tp_as->func(concrete_self, concrete_o1, concrete_o2); \
                                     }
 
 #define OBJOBJ_AS(func, tp_as)      static int \
@@ -794,7 +772,36 @@ get_mp_ass_subscript_handler(SymbolicAdapter *adapter, objobjargproc func) {
         return adapter->list_set_item;
     return adapter->default_ternary_notify;
 }
-OBJOBJARG_AS(mp_ass_subscript, tp_as_mapping, get_mp_ass_subscript_handler)
+
+static int
+mp_ass_subscript(PyObject *self, PyObject *index, PyObject *value) {
+    PyObject *concrete_self = unwrap(self);
+    PyObject *concrete_o1 = unwrap(index);
+    PyObject *concrete_o2 = unwrap(value);
+    PyObject *symbolic_self = get_symbolic_or_none(self);
+    PyObject *symbolic_index = get_symbolic_or_none(index);
+    PyObject *symbolic_value = get_symbolic_or_none(value);
+    if (concrete_self->ob_type->tp_as_mapping == 0) {
+        PyErr_SetString(PyExc_TypeError, "no mp_ass_subscript");
+        return -1;
+    }
+    if (concrete_self->ob_type->tp_as_mapping->mp_ass_subscript == 0) {
+        PyErr_SetString(PyExc_TypeError, "no mp_ass_subscript");
+        return -1;
+    }
+    SymbolicAdapter *adapter = get_adapter(self);
+    if (adapter->mp_ass_subscript(adapter->handler_param, symbolic_self, symbolic_index, symbolic_value))
+        return -1;
+    objobjargproc func = concrete_self->ob_type->tp_as_mapping->mp_ass_subscript;
+    int concrete_result = func(concrete_self, concrete_o1, concrete_o2);
+    if (adapter) {
+        int res = get_mp_ass_subscript_handler(adapter, func)(
+                adapter->handler_param, symbolic_self, symbolic_index, symbolic_value);
+        if (res != 0) return -1;
+    }
+    return concrete_result;
+}
+
 SLOT(mp_ass_subscript)
 
 PyType_Slot final_slot = {0, NULL};

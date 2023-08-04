@@ -1528,7 +1528,7 @@ PyObject_IsTrue(PyObject *v)
     //printf("HERE (PyObject_True)! %p %ld\n", v, Py_REFCNT(v)); fflush(stdout);
     if (is_wrapped(v) && res >= 0) {
         SymbolicAdapter *adapter = get_adapter(v);
-        if (adapter->fork_result(adapter->handler_param, res > 0))
+        if (adapter->fork_result(adapter->handler_param, get_symbolic_or_none(v), res > 0))
             return -1;
     }
     Py_DECREF(v);
