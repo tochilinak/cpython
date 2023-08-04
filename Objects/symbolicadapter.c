@@ -2,6 +2,7 @@
 #include "symbolicadapter.h"
 
 #include "pycore_frame.h"
+#include "opcode.h"
 
 static void
 adapter_dealloc(PyObject *op) {
@@ -18,8 +19,18 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
     if (what == PyTrace_OPCODE && !adapter->ignore) {
         //printf("INSTRUCTION ON CODE %ld\n", (long) PyFrame_GetCode(frame)); fflush(stdout);
         result = adapter->instruction(adapter->handler_param, frame);
-    } else if (what == PyTrace_RETURN && !adapter->ignore) {
-        // result = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_RETURN, 0, 0);
+    }
+    if (!PyErr_Occurred()) {
+        Py_ssize_t lasti = PyFrame_GetLasti(frame);
+        PyObject *code_bytes = PyCode_GetCode(PyFrame_GetCode(frame));
+        assert(PyBytes_Check(code_bytes));
+        PyObject *cur_instruction_as_long = PySequence_GetItem(code_bytes, lasti);
+        assert(PyLong_Check(cur_instruction_as_long));
+        long cur_instruction = PyLong_AsLong(cur_instruction_as_long);
+        if (what == PyTrace_OPCODE && !adapter->ignore && cur_instruction == RETURN_VALUE) {
+            if (adapter->function_return(adapter->handler_param, (PyObject *) PyFrame_GetCode(frame)))
+                return -1;
+        }
     }
 
     return result;
@@ -47,8 +58,7 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
         return 0;
     }
 
-    // PyObject *args_for_handler[] = { function };
-    // make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args_for_handler);
+    adapter->function_call(adapter->handler_param, PyFunction_GetCode(function));
     PyObject *result = Py_TYPE(function)->tp_call(function, wrappers, 0);
 
     gil = PyGILState_Ensure();
@@ -139,11 +149,14 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     SymbolicAdapter *result = PyObject_New(SymbolicAdapter, &SymbolicAdapter_Type);
     Py_INCREF(ready_wrapper_types);
     result->ignore = 0;
+    result->inside_wrapper_tp_call = 0;
     result->handler_param = handler_param;
     result->ready_wrapper_types = ready_wrapper_types;
     result->instruction = default_instruction;
     result->fork_notify = default_unary_notify;
     result->fork_result = default_fork_result;
+    result->function_call = default_unary_notify;
+    result->function_return = default_unary_notify;
     result->load_const = default_unary;
     result->create_list = default_create_list;
     result->gt_long = default_binary;
@@ -211,6 +224,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;
     result->approximation_list_richcompare = 0;
+    result->add_concrete_supertype = default_binary_notify;
     result->default_unary_handler = default_unary;
     result->default_binary_handler = default_binary;
     result->default_ternary_handler = default_ternary;

@@ -209,13 +209,15 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     assert(adapter != 0);
 
     if (PyFunction_Check(concrete_self)) {
-        int res = register_symbolic_tracing(concrete_self, adapter);
-        if (res != 0)
+        if (register_symbolic_tracing(concrete_self, adapter))
             return 0;
-
-        // PyObject *args[] = { concrete_self };
-        // make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, SYM_EVENT_ID_PYTHON_FUNCTION_CALL, 1, args);
-        return Py_TYPE(concrete_self)->tp_call(concrete_self, o1, o2);
+        if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(concrete_self)))
+            return 0;
+        PyObject *old = adapter->inside_wrapper_tp_call;
+        adapter->inside_wrapper_tp_call = PyFunction_GetCode(concrete_self);
+        PyObject *result = Py_TYPE(concrete_self)->tp_call(concrete_self, o1, o2);
+        adapter->inside_wrapper_tp_call = old;
+        return result;
     }
 
     int approximated = 0;

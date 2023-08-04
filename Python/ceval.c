@@ -1588,37 +1588,6 @@ do { \
     } \
 } while (0)
 
-/*
-#define CALL_SYMBOLIC_HANDLER(event_type, event_id, nargs, ...) \
-do { \
-    PyObject *args[] = {__VA_ARGS__}; \
-    CALL_SYMBOLIC_HANDLER_ARRAY(event_type, event_id, nargs, args); \
-} while (0)
-
-#define CALL_SYMBOLIC_HANDLER_ARRAY(event_type, event_id, nargs, args) \
-do { \
-    set_adapter_if_symbolic_tracing_enabled \
-    if (adapter) { \
-        PyObject *result = make_call_symbolic_handler(adapter, event_type, event_id, nargs, args); \
-        if (result && result != Py_None && (event_type) == SYM_EVENT_TYPE_STACK) { \
-            if (!PyTuple_CheckExact(result)) { \
-                 PyErr_SetString(PyExc_AssertionError, "Symbolic handler must return tuple"); \
-                 goto error; \
-            } \
-            n_symbolic_for_stack = PyTuple_Size(result); \
-            symbolic_for_stack = PyMem_RawMalloc(n_symbolic_for_stack * sizeof(PyObject*)); \
-            for (int i = 0; i < n_symbolic_for_stack; i++) { \
-                PyObject *elem = PyTuple_GetItem(result, n_symbolic_for_stack - i - 1);     \
-                Py_INCREF(elem); \
-                symbolic_for_stack[i] = elem; \
-            } \
-            Py_DECREF(result); \
-        } \
-        if (PyErr_Occurred()) goto error; \
-    } \
-} while (0)
-*/
-
 /* Shared opcode macros */
 
 // shared by LOAD_ATTR_MODULE and LOAD_METHOD_MODULE
@@ -2594,8 +2563,10 @@ handle_eval_breaker:
             goto error;
         }
 
-        TARGET(RETURN_VALUE) {  // ??? For now returns unwrapped values
-            TOUCH_STACK(1, -2);
+        TARGET(RETURN_VALUE) {  // Depends
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (!local_adapter || local_adapter->inside_wrapper_tp_call != frame->f_code)
+                TOUCH_STACK(1, -2);
             UNWRAP_LOCALS();
             PyObject *retval = POP();
             assert(EMPTY());
