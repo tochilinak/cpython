@@ -561,6 +561,8 @@ static binary_handler
 get_nb_mult_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_multiply)
         return adapter->mul_long;
+    if (func == adapter->virtual_nb_multiply)
+        return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
 BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_handler)

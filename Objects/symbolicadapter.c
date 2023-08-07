@@ -220,6 +220,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->virtual_tp_richcompare = 0;
     result->virtual_tp_iter = 0;
     result->virtual_nb_add = 0;
+    result->virtual_nb_multiply = 0;
     result->virtual_mp_subscript = 0;
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;
