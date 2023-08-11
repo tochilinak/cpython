@@ -85,6 +85,7 @@ typedef struct {
     void *virtual_tp_iter;
     void *virtual_nb_add;
     void *virtual_nb_multiply;
+    void *virtual_nb_matrix_multiply;
     void *virtual_mp_subscript;
     PyObject *(*approximation_builtin_len)(PyObject *);
     PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);

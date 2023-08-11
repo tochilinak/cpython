@@ -723,7 +723,13 @@ nb_index(PyObject *self) {
 }
 SLOT(nb_index)
 
-BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, default_binary_handler_getter)
+static binary_handler
+get_nb_matrix_multiply_handler(SymbolicAdapter *adapter, binaryfunc func) {
+    if (func == adapter->virtual_nb_matrix_multiply)
+        return adapter->symbolic_virtual_binary_fun;
+    return adapter->default_binary_handler;
+}
+BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, get_nb_matrix_multiply_handler)
 SLOT(nb_matrix_multiply)
 BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_binary_handler_getter)
 SLOT(nb_inplace_matrix_multiply)
