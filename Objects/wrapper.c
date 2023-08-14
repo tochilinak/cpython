@@ -552,6 +552,8 @@ static binary_handler
 get_nb_sub_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_subtract)
         return adapter->sub_long;
+    if (func == adapter->virtual_nb_subtract)
+        return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
 BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_handler)

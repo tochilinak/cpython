@@ -84,6 +84,7 @@ typedef struct {
     void *virtual_tp_richcompare;
     void *virtual_tp_iter;
     void *virtual_nb_add;
+    void *virtual_nb_subtract;
     void *virtual_nb_multiply;
     void *virtual_nb_matrix_multiply;
     void *virtual_mp_subscript;
