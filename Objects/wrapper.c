@@ -411,8 +411,10 @@ SLOT(tp_hash)
                                                 fun = concrete_other->ob_type->tp_as->func; \
                                             } \
                                         } \
-                                        PyObject *symbolic = Py_None;      \
-                                        if (result != Py_NotImplemented) {             \
+                                        PyObject *symbolic = Py_None; \
+                                        if (result != Py_NotImplemented) { \
+                                            if (adapter->fixate_type(adapter->handler_param, get_symbolic_or_none(self))) return 0; \
+                                            if (adapter->fixate_type(adapter->handler_param, get_symbolic_or_none(other))) return 0; \
                                             symbolic = handler_getter(adapter, result_fun)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other)); \
                                             if (!symbolic) return 0; \
                                         }\

@@ -226,7 +226,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;
     result->approximation_list_richcompare = 0;
-    result->add_concrete_supertype = default_binary_notify;
+    result->fixate_type = default_unary_notify;
     result->default_unary_handler = default_unary;
     result->default_binary_handler = default_binary;
     result->default_ternary_handler = default_ternary;

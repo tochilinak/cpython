@@ -91,7 +91,7 @@ typedef struct {
     PyObject *(*approximation_builtin_len)(PyObject *);
     PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);
     PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
-    int (*add_concrete_supertype)(void *, PyObject *, PyObject *);
+    int (*fixate_type)(void *, PyObject *);
     unary_handler default_unary_handler;
     binary_handler default_binary_handler;
     ternary_handler default_ternary_handler;
