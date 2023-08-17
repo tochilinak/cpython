@@ -81,6 +81,7 @@ typedef struct {
     int (*tp_iternext)(void *, PyObject *);
     PyObject *(*symbolic_virtual_unary_fun)(void *, PyObject *);
     PyObject *(*symbolic_virtual_binary_fun)(void *, PyObject *left, PyObject *right);
+    int (*lost_symbolic_value)(void *, const char *description);
     void *virtual_tp_richcompare;
     void *virtual_tp_iter;
     void *virtual_nb_add;

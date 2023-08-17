@@ -202,6 +202,8 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
     return 0;
 }
 
+char buffer[1000000];
+
 static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     PyObject *concrete_self = unwrap(self);
@@ -249,6 +251,11 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         PyErr_SetString(PyExc_TypeError, "no tp_call");
         return 0;
     }
+    const char *repr = "";
+    if (PyCFunction_Check(concrete_self))
+        repr = PyUnicode_AsUTF8AndSize(PyObject_Repr(concrete_self), 0);
+    sprintf(buffer, "Callable of type %s at %p (%s)", Py_TYPE(concrete_self)->tp_name, concrete_self, repr);
+    if (adapter->lost_symbolic_value(adapter->handler_param, buffer)) return 0;
     return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), 0, adapter);
 }
 SLOT(tp_call)
@@ -336,30 +343,6 @@ tp_hash(PyObject *self) {
     return concrete_self->ob_type->tp_hash(concrete_self);
 }
 SLOT(tp_hash)
-
-#define INQUIRY_NUMBER(func, notifier_id) \
-                                    int \
-                                    func(PyObject *self) \
-                                    { \
-                                        /*printf("calling %s on %p\n", #func, self);*/ \
-                                        PyObject *concrete_self = unwrap(self); \
-                                        if (concrete_self->ob_type->tp_as_number == 0) { \
-                                            PyErr_SetString(PyExc_TypeError, "no number"); \
-                                            return 0; \
-                                        } \
-                                        if (concrete_self->ob_type->tp_as_number->func == 0) { \
-                                            PyErr_SetString(PyExc_TypeError, "no func"); \
-                                            return 0; \
-                                        } \
-                                        if (notifier_id != -1) { \
-                                            SymbolicAdapter *adapter = get_adapter(self); \
-                                            PyObject *symbolic_self = get_symbolic_or_none(self); \
-                                            PyObject *args[] = {symbolic_self}; \
-                                            PyObject *res = make_call_symbolic_handler(adapter, SYM_EVENT_TYPE_NOTIFY, notifier_id, 1, args); \
-                                            if (res != 0 && res != Py_None) return -1; \
-                                        }  \
-                                        return concrete_self->ob_type->tp_as_number->func(concrete_self); \
-                                    }
 
 #define UNARY_FUN_AS(func, tp_as, handler_getter) \
                                     static PyObject * \

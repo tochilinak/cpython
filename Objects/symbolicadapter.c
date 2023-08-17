@@ -143,6 +143,7 @@ static PyObject *default_unary(void *arg, PyObject *o) { Py_RETURN_NONE; }
 static PyObject *default_binary(void *arg, PyObject *left, PyObject *right) { Py_RETURN_NONE; }
 static PyObject *default_ternary(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { Py_RETURN_NONE; }
 static int default_set_item(void *arg, PyObject *storage, PyObject *index, PyObject *value) { return 0; }
+static int default_lost_symbolic_value(void *arg, char *description) { return 0; }
 
 static SymbolicAdapter *
 create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
@@ -217,6 +218,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->tp_iternext = default_unary_notify;
     result->symbolic_virtual_unary_fun = default_unary;
     result->symbolic_virtual_binary_fun = default_binary;
+    result->lost_symbolic_value = default_lost_symbolic_value;
     result->virtual_tp_richcompare = 0;
     result->virtual_tp_iter = 0;
     result->virtual_nb_add = 0;
