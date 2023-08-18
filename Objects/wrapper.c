@@ -252,7 +252,7 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         return 0;
     }
     const char *repr = "";
-    if (PyCFunction_Check(concrete_self))
+    if (PyCFunction_Check(concrete_self) || PyType_Check(concrete_self))
         repr = PyUnicode_AsUTF8AndSize(PyObject_Repr(concrete_self), 0);
     sprintf(buffer, "Callable of type %s at %p (%s)", Py_TYPE(concrete_self)->tp_name, concrete_self, repr);
     if (adapter->lost_symbolic_value(adapter->handler_param, buffer)) return 0;

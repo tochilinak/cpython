@@ -143,7 +143,7 @@ static PyObject *default_unary(void *arg, PyObject *o) { Py_RETURN_NONE; }
 static PyObject *default_binary(void *arg, PyObject *left, PyObject *right) { Py_RETURN_NONE; }
 static PyObject *default_ternary(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { Py_RETURN_NONE; }
 static int default_set_item(void *arg, PyObject *storage, PyObject *index, PyObject *value) { return 0; }
-static int default_lost_symbolic_value(void *arg, char *description) { return 0; }
+static int default_lost_symbolic_value(void *arg, const char *description) { return 0; }
 
 static SymbolicAdapter *
 create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
@@ -268,13 +268,18 @@ register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter) {
 
     PyTupleObject *consts = (PyTupleObject *) code->co_consts;
     Py_ssize_t n_consts = PyTuple_GET_SIZE(consts);
-    PyObject *last = PyTuple_GetItem(code->co_consts, n_consts - 1);
-    if (last == (PyObject *) adapter)
-        return 0;
-    if (Py_TYPE(last) == &SymbolicAdapter_Type) {
-        PyTuple_SET_ITEM(code->co_consts, n_consts - 1, adapter);
-        return 0;
+
+    if (n_consts >= 1) {
+        PyObject *last = PyTuple_GetItem(code->co_consts, n_consts - 1);
+        if (last == (PyObject *) adapter)
+            return 0;
+
+        if (Py_TYPE(last) == &SymbolicAdapter_Type) {
+            PyTuple_SET_ITEM(code->co_consts, n_consts - 1, adapter);
+            return 0;
+        }
     }
+
 
     PyTupleObject *new_consts = (PyTupleObject *) PyTuple_New(n_consts + 1);
     memcpy(new_consts->ob_item, consts->ob_item, n_consts * sizeof(PyObject *));
