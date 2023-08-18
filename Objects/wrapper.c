@@ -52,6 +52,7 @@ static PyObject *
 tp_getattr(PyObject *self, char *attr) {
     PyObject *concrete_self = unwrap(self);
     SymbolicAdapter *adapter = get_adapter(self);
+    if (adapter->lost_symbolic_value(adapter->handler_param, "tp_getattr")) return 0;
     return wrap(concrete_self->ob_type->tp_getattr(concrete_self, attr), 0, adapter);
 }
 SLOT(tp_getattr)
@@ -70,6 +71,9 @@ tp_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
     PyObject *concrete_self = unwrap(self);
     PyObject *concrete_obj = unwrap(obj);
     PyObject *concrete_type = unwrap(type);
+    SymbolicAdapter *adapter = get_adapter(self);
+    assert(adapter != 0);
+    if (adapter->lost_symbolic_value(adapter->handler_param, "tp_descr_get")) return 0;
     return concrete_self->ob_type->tp_descr_get(concrete_self, concrete_obj, concrete_type);
 }
 SLOT(tp_descr_get)
@@ -93,6 +97,8 @@ tp_getattro(PyObject *self, PyObject *other) {
 
     PyObject *concrete_other = unwrap(other);
     SymbolicAdapter *adapter = get_adapter(self);
+    assert(adapter != 0);
+    if (adapter->lost_symbolic_value(adapter->handler_param, "tp_getattro")) return 0;
     return wrap(concrete_self->ob_type->tp_getattro(concrete_self, concrete_other), 0, adapter);
 }
 SLOT(tp_getattro)
@@ -175,6 +181,11 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
         symbolic = tp_richcompare_handler_getter(adapter, concrete_self->ob_type->tp_richcompare, op)(adapter->handler_param, symbolic_self, symbolic_other);
         if (!symbolic) return 0;
     }
+    if (symbolic == Py_None && symbolic_self != Py_None) {
+        assert(adapter != 0);
+        sprintf(adapter->msg_buffer, "tp_richcompare of %s and %s", Py_TYPE(concrete_self)->tp_name, Py_TYPE(concrete_other)->tp_name);
+        if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
+    }
     return wrap(concrete_result, symbolic, adapter);
 }
 SLOT(tp_richcompare)
@@ -202,7 +213,6 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
     return 0;
 }
 
-char buffer[1000000];
 
 static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
@@ -254,17 +264,15 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     const char *repr = "";
     if (PyCFunction_Check(concrete_self) || PyType_Check(concrete_self))
         repr = PyUnicode_AsUTF8AndSize(PyObject_Repr(concrete_self), 0);
-    sprintf(buffer, "Callable of type %s at %p (%s)", Py_TYPE(concrete_self)->tp_name, concrete_self, repr);
-    if (adapter->lost_symbolic_value(adapter->handler_param, buffer)) return 0;
+    sprintf(adapter->msg_buffer, "Callable of type %s at %p (%s)", Py_TYPE(concrete_self)->tp_name, concrete_self, repr);
+    if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
     return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), 0, adapter);
 }
 SLOT(tp_call)
 
-//TODO
 int
 tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
 {
-    //printf("calling %s on %p\n", "tp_setattro", self);
     PyObject *concrete_self = unwrap(self);
     PyObject *concrete_attr = unwrap(attr);
     PyObject *concrete_value = unwrap(value);
@@ -302,6 +310,12 @@ tp_iter(PyObject *self) {
     if (!symbolic_result)
         return 0;
 
+    if (symbolic_result == Py_None && symbolic_self != Py_None) {
+        assert(adapter != 0);
+        sprintf(adapter->msg_buffer, "tp_iter of %s", Py_TYPE(concrete_self)->tp_name);
+        if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
+    }
+
     return wrap(concrete_self->ob_type->tp_iter(concrete_self), symbolic_result, adapter);
 }
 SLOT(tp_iter)
@@ -329,6 +343,12 @@ tp_iternext(PyObject *self) {
     if (!symbolic_result)
         return 0;
 
+    if (symbolic_result == Py_None && symbolic_self != Py_None) {
+        assert(adapter != 0);
+        sprintf(adapter->msg_buffer, "tp_iternext of %s", Py_TYPE(concrete_self)->tp_name);
+        if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
+    }
+
     return wrap(concrete_result, symbolic_result, adapter);
 }
 SLOT(tp_iternext)
@@ -340,6 +360,11 @@ tp_hash(PyObject *self) {
         PyErr_SetString(PyExc_TypeError, "no tp_hash");
         return 0;
     }
+
+    SymbolicAdapter *adapter = get_adapter(self);
+    assert(adapter != 0);
+    if (adapter->lost_symbolic_value(adapter->handler_param, "tp_hash")) return 0;
+
     return concrete_self->ob_type->tp_hash(concrete_self);
 }
 SLOT(tp_hash)
@@ -361,9 +386,15 @@ SLOT(tp_hash)
                                         } \
                                         PyObject *concrete_result = concrete_self->ob_type->tp_as->func(concrete_self); \
                                         PyObject *symbolic = Py_None; \
+                                        PyObject *symbolic_self = get_symbolic_or_none(self); \
                                         if (concrete_result != Py_NotImplemented) \
-                                            symbolic = handler_getter(adapter, concrete_self->ob_type->tp_as->func)(adapter->handler_param, get_symbolic_or_none(self)); \
+                                            symbolic = handler_getter(adapter, concrete_self->ob_type->tp_as->func)(adapter->handler_param, symbolic_self); \
                                         if (!symbolic) return 0; \
+                                        if (symbolic == Py_None && symbolic_self != Py_None) { \
+                                            assert(adapter != 0); \
+                                            sprintf(adapter->msg_buffer, #func " on %s", Py_TYPE(concrete_self)->tp_name); \
+                                            if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0; \
+                                        } \
                                         return wrap(concrete_result, symbolic, adapter); \
                                     }
 
@@ -395,12 +426,19 @@ SLOT(tp_hash)
                                             } \
                                         } \
                                         PyObject *symbolic = Py_None; \
+                                        PyObject *symbolic_self = get_symbolic_or_none(self); \
+                                        PyObject *symbolic_other = get_symbolic_or_none(other); \
                                         if (result != Py_NotImplemented) { \
-                                            if (adapter->fixate_type(adapter->handler_param, get_symbolic_or_none(self))) return 0; \
-                                            if (adapter->fixate_type(adapter->handler_param, get_symbolic_or_none(other))) return 0; \
+                                            if (adapter->fixate_type(adapter->handler_param, symbolic_self)) return 0; \
+                                            if (adapter->fixate_type(adapter->handler_param, symbolic_other)) return 0; \
                                             symbolic = handler_getter(adapter, result_fun)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other)); \
                                             if (!symbolic) return 0; \
-                                        }\
+                                        } \
+                                        if (symbolic == Py_None && symbolic_self != Py_None && symbolic_other != Py_None) { \
+                                            assert(adapter != 0); \
+                                            sprintf(adapter->msg_buffer, #func " on %s and %s", Py_TYPE(concrete_self)->tp_name, Py_TYPE(concrete_other)->tp_name); \
+                                            if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0; \
+                                        } \
                                         return wrap(result, symbolic, adapter); \
                                     }
 
@@ -430,10 +468,18 @@ SLOT(tp_hash)
                                             } \
                                         } \
                                         PyObject *symbolic = Py_None; \
+                                        PyObject *symbolic_self = get_symbolic_or_none(self); \
+                                        PyObject *symbolic_o1 = get_symbolic_or_none(o1); \
+                                        PyObject *symbolic_o2 = get_symbolic_or_none(o2); \
                                         if (result != Py_NotImplemented) { \
-                                            symbolic = handler_getter(adapter, result_func)(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(o1), get_symbolic_or_none(o2)); \
+                                            symbolic = handler_getter(adapter, result_func)(adapter->handler_param, symbolic_self, symbolic_o1, symbolic_o2); \
                                             if (!symbolic) return 0; \
-                                        }\
+                                        } \
+                                        if (symbolic == Py_None && symbolic_self != Py_None && symbolic_o1 != Py_None) { \
+                                            assert(adapter != 0); \
+                                            sprintf(adapter->msg_buffer, #func " on %s and %s and %s", Py_TYPE(concrete_self)->tp_name, Py_TYPE(concrete_o1)->tp_name, Py_TYPE(concrete_o2)->tp_name); \
+                                            if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0; \
+                                        } \
                                         return wrap(result, symbolic, adapter); \
                                     }
 

@@ -97,6 +97,7 @@ typedef struct {
     binary_handler default_binary_handler;
     ternary_handler default_ternary_handler;
     ternary_notify default_ternary_notify;
+    char msg_buffer[5000];
 } SymbolicAdapter;
 
 #include "wrapper.h"
