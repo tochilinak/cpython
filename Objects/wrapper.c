@@ -325,6 +325,8 @@ get_tp_iter_handler(SymbolicAdapter *adapter, getiterfunc func) {
         return adapter->list_iter;
     if (func == adapter->virtual_tp_iter)
         return adapter->symbolic_virtual_unary_fun;
+    if (func == PyTuple_Type.tp_iter)
+        return adapter->tuple_iter;
     if (func == PyRange_Type.tp_iter)
         return adapter->range_iter;
     return adapter->default_unary_handler;
@@ -362,6 +364,8 @@ get_tp_iternext_handler(SymbolicAdapter *adapter, iternextfunc func) {
         return adapter->list_iterator_next;
     if (func == PyRangeIter_Type.tp_iternext)
         return adapter->range_iterator_next;
+    if (func == PyTupleIter_Type.tp_iternext)
+        return adapter->tuple_iterator_next;
     return adapter->default_unary_handler;
 }
 

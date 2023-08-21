@@ -3417,6 +3417,18 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_TUPLE) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = 0;
+            if (local_adapter) {
+                PyObject *args[257];
+                for (int i = 1; i <= oparg; i++) {
+                    Py_XINCREF(get_symbolic(stack_pointer[-i]));
+                    args[oparg - i] = get_symbolic(stack_pointer[-i]);
+                }
+                args[oparg] = 0;
+                symbolic = local_adapter->create_tuple(local_adapter->handler_param, args);
+                if (!symbolic) goto error;
+            }
             TOUCH_STACK(oparg, -1);
             PyObject *tup = PyTuple_New(oparg);
             if (tup == NULL)
@@ -3426,6 +3438,8 @@ handle_eval_breaker:
                 PyTuple_SET_ITEM(tup, oparg, item);
             }
             PUSH(tup);
+            if (local_adapter)
+                TOP() = wrap(TOP(), symbolic, local_adapter);
             DISPATCH();
         }
 

@@ -24,6 +24,7 @@ typedef struct {
     int (*function_return)(void *, PyObject *code);
     PyObject *(*load_const)(void *, PyObject *obj);
     PyObject *(*create_list)(void *, PyObject **elems);
+    PyObject *(*create_tuple)(void *, PyObject **elems);
     PyObject *(*create_range)(void *, PyObject *start, PyObject *stop, PyObject *step);
     PyObject *(*gt_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*lt_long)(void *, PyObject *left, PyObject *right);
@@ -45,6 +46,8 @@ typedef struct {
     PyObject *(*list_get_size)(void *, PyObject *list);
     PyObject *(*list_iter)(void *, PyObject *list);
     PyObject *(*list_iterator_next)(void *, PyObject *iterator);
+    PyObject *(*tuple_iter)(void *, PyObject *tuple);
+    PyObject *(*tuple_iterator_next)(void *, PyObject *iterator);
     PyObject *(*range_iter)(void *, PyObject *range);
     PyObject *(*range_iterator_next)(void *, PyObject *iterator);
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
