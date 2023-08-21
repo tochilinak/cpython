@@ -14,6 +14,7 @@ typedef struct {
     PyObject_HEAD
     void *handler_param;
     PyObject *ready_wrapper_types;
+    PyObject *c_function_owner_map;
     int ignore;
     void *inside_wrapper_tp_call;
     int (*instruction)(void *, PyFrameObject *frame);
@@ -23,6 +24,7 @@ typedef struct {
     int (*function_return)(void *, PyObject *code);
     PyObject *(*load_const)(void *, PyObject *obj);
     PyObject *(*create_list)(void *, PyObject **elems);
+    PyObject *(*create_range)(void *, PyObject *start, PyObject *stop, PyObject *step);
     PyObject *(*gt_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*lt_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*eq_long)(void *, PyObject *left, PyObject *right);
@@ -43,6 +45,8 @@ typedef struct {
     PyObject *(*list_get_size)(void *, PyObject *list);
     PyObject *(*list_iter)(void *, PyObject *list);
     PyObject *(*list_iterator_next)(void *, PyObject *iterator);
+    PyObject *(*range_iter)(void *, PyObject *range);
+    PyObject *(*range_iterator_next)(void *, PyObject *iterator);
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
     int (*nb_add)(void *, PyObject *left, PyObject *right);
     int (*nb_subtract)(void *, PyObject *left, PyObject *right);
@@ -92,6 +96,8 @@ typedef struct {
     PyObject *(*approximation_builtin_len)(PyObject *);
     PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);
     PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
+    PyObject *(*approximation_range)(void *adapter, PyObject *args);
+    PyObject *(*approximation_list_append)(PyObject *append_method, PyObject *symbolic_list, PyObject *wrapped_elem);
     int (*fixate_type)(void *, PyObject *);
     unary_handler default_unary_handler;
     binary_handler default_binary_handler;

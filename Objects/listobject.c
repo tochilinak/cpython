@@ -8,6 +8,8 @@
 #include "pycore_tuple.h"         // _PyTuple_FromArray()
 #include <stddef.h>
 
+#include "approximation_defs.h"
+
 /*[clinic input]
 class list "PyListObject *" "&PyList_Type"
 [clinic start generated code]*/
@@ -3472,3 +3474,5 @@ listiter_reduce_general(void *_it, int forward)
         return NULL;
     return Py_BuildValue("N(N)", _PyEval_GetBuiltin(&_Py_ID(iter)), list);
 }
+
+void *EXPORT_FOR_APPROXIMATION_LIST_APPEND = list_append;

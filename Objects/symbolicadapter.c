@@ -8,6 +8,7 @@ static void
 adapter_dealloc(PyObject *op) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) op;
     Py_DECREF(adapter->ready_wrapper_types);
+    Py_DECREF(adapter->c_function_owner_map);
     Py_TYPE(op)->tp_free(op);
 }
 
@@ -150,6 +151,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     SymbolicAdapter *result = PyObject_New(SymbolicAdapter, &SymbolicAdapter_Type);
     Py_INCREF(ready_wrapper_types);
     result->ignore = 0;
+    result->c_function_owner_map = PyDict_New();
     result->inside_wrapper_tp_call = 0;
     result->handler_param = handler_param;
     result->ready_wrapper_types = ready_wrapper_types;
@@ -160,6 +162,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->function_return = default_unary_notify;
     result->load_const = default_unary;
     result->create_list = default_create_list;
+    result->create_range = default_ternary;
     result->gt_long = default_binary;
     result->lt_long = default_binary;
     result->eq_long = default_binary;
@@ -180,6 +183,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->list_get_size = default_unary;
     result->list_iter = default_unary;
     result->list_iterator_next = default_unary;
+    result->range_iter = default_unary;
+    result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
     result->nb_add = default_binary_notify;
     result->nb_subtract = default_binary_notify;
@@ -228,6 +233,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;
     result->approximation_list_richcompare = 0;
+    result->approximation_range = 0;
+    result->approximation_list_append = 0;
     result->fixate_type = default_unary_notify;
     result->default_unary_handler = default_unary;
     result->default_binary_handler = default_binary;

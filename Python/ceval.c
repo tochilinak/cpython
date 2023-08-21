@@ -2404,13 +2404,19 @@ handle_eval_breaker:
                 symbolic = local_adapter->list_append(local_adapter->handler_param, get_symbolic_or_none(PEEK(oparg + 1)), get_symbolic_or_none(TOP()));
                 if (!symbolic) goto error;
             }
-            TOUCH_STACK(oparg + 1, -1);
-            PyObject *v = POP();
-            PyObject *list = PEEK(oparg);
+            /* TOUCH_STACK(oparg + 1, -1); */
+            PyObject *v_wrapped = POP();
+            PyObject *v = unwrap(v_wrapped);
+            Py_INCREF(v);
+            Py_DECREF(v_wrapped);
+            PyObject *list_wrapped = PEEK(oparg);
+            PyObject *list = unwrap(list_wrapped);
+            Py_INCREF(list);
+            Py_DECREF(list_wrapped);
             if (_PyList_AppendTakeRef((PyListObject *)list, v) < 0)
                 goto error;
             if (local_adapter) {
-                PEEK(oparg) = wrap(PEEK(oparg), symbolic, local_adapter);
+                PEEK(oparg) = wrap(list, symbolic, local_adapter);
             }
             PREDICT(JUMP_BACKWARD_QUICK);
             DISPATCH();
