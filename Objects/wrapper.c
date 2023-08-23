@@ -236,6 +236,19 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
         PyObject *type = PyTuple_GetItem(o1, 1);
         *called_approximation = 1;
         return adapter->approximation_builtin_isinstance(obj, type);
+
+    } else if (c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_SUM && adapter->approximation_builtin_sum) {
+        if (o2 || !PyTuple_Check(o1) || PyTuple_GET_SIZE(o1) != 1)
+            return 0;
+        *called_approximation = 1;
+        return adapter->approximation_builtin_sum(PyTuple_GetItem(o1, 0));
+
+    } else if ((c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_MIN
+            || c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_MAX
+            || c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_ALL) && !o2) {
+        *called_approximation = 1;
+        return Py_TYPE(original)->tp_call(original, o1, 0);
+
     }
     return 0;
 }
@@ -246,6 +259,8 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     PyObject *concrete_self = unwrap(self);
     SymbolicAdapter *adapter = get_adapter(self);
     assert(adapter != 0);
+    assert(PyTuple_Check(o1));
+    assert(!o2 || PyDict_Check(o2));
 
     if (PyFunction_Check(concrete_self)) {
         if (register_symbolic_tracing(concrete_self, adapter))

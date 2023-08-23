@@ -9,6 +9,7 @@ typedef PyObject *(*unary_handler)(void *, PyObject *o);
 typedef PyObject *(*binary_handler)(void *, PyObject *left, PyObject *right);
 typedef PyObject *(*ternary_handler)(void *, PyObject *o1, PyObject *o2, PyObject *o3);
 typedef int (*ternary_notify)(void *, PyObject *o1, PyObject *o2, PyObject *o3);
+typedef void (*runnable)();
 
 typedef struct {
     PyObject_HEAD
@@ -22,6 +23,7 @@ typedef struct {
     int (*fork_result)(void *, PyObject *on, int result);
     int (*function_call)(void *, PyObject *code);
     int (*function_return)(void *, PyObject *code);
+    int (*unpack)(void *, PyObject *iterable, int count);
     PyObject *(*load_const)(void *, PyObject *obj);
     PyObject *(*create_list)(void *, PyObject **elems);
     PyObject *(*create_tuple)(void *, PyObject **elems);
@@ -101,6 +103,7 @@ typedef struct {
     PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
     PyObject *(*approximation_range)(void *adapter, PyObject *args);
     PyObject *(*approximation_list_append)(PyObject *append_method, PyObject *symbolic_list, PyObject *wrapped_elem);
+    PyObject *(*approximation_builtin_sum)(PyObject *);
     int (*fixate_type)(void *, PyObject *);
     unary_handler default_unary_handler;
     binary_handler default_binary_handler;
@@ -113,8 +116,7 @@ typedef struct {
 
 PyAPI_FUNC(int) register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter);
 PyAPI_FUNC(SymbolicAdapter*) create_new_adapter(void *param);
-PyAPI_FUNC(PyObject*) SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args);
-PyObject *make_call_symbolic_handler(SymbolicAdapter *adapter, int event_type, int event_id, int nargs, PyObject *const *args);
+PyAPI_FUNC(PyObject*) SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args, runnable before_call, runnable after_call);
 int SymbolicAdapter_CheckExact(PyObject *obj);
 
 #endif //CPYTHON_SYMBOLICADAPTER_H

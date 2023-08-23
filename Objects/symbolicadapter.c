@@ -38,7 +38,7 @@ trace_function(PyObject *obj, PyFrameObject *frame, int what, PyObject *arg) {
 }
 
 PyObject *
-SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args) {
+SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args, runnable before_call, runnable after_call) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) self;
     PyObject *wrappers = PyTuple_New(n);
     for (int i = 0; i < n; i++) {
@@ -59,8 +59,14 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
         return 0;
     }
 
+    if (before_call)
+        before_call();
+
     adapter->function_call(adapter->handler_param, PyFunction_GetCode(function));
     PyObject *result = Py_TYPE(function)->tp_call(function, wrappers, 0);
+
+    if (after_call)
+        after_call();
 
     gil = PyGILState_Ensure();
     PyEval_SetTrace(0, 0);
@@ -83,7 +89,7 @@ adapter_run(PyObject *self, PyObject *args) {
     }
     Py_ssize_t n = PyTuple_GET_SIZE(args) - 1;
     PyTupleObject *args_as_tuple = (PyTupleObject *) args;
-    return SymbolicAdapter_run(self, function, n, args_as_tuple->ob_item + 1);
+    return SymbolicAdapter_run(self, function, n, args_as_tuple->ob_item + 1, 0, 0);
 }
 
 static PyMethodDef adapter_methods[] = {
@@ -138,7 +144,7 @@ static PyObject *default_create_collection(void *arg, PyObject **elems) { Py_RET
 static int default_unary_notify(void *arg, PyObject *on) { return 0; }
 static int default_binary_notify(void *arg, PyObject *first, PyObject *second) { return 0; }
 static int default_ternary_notify(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { return 0; }
-static int default_fork_result(void *arg, PyObject *on, int result) { return 0; }
+static int default_notify_object_and_int(void *arg, PyObject *on, int result) { return 0; }
 static int default_tp_richcompare(void *arg, int op, PyObject *first, PyObject *second) { return 0; }
 static PyObject *default_unary(void *arg, PyObject *o) { Py_RETURN_NONE; }
 static PyObject *default_binary(void *arg, PyObject *left, PyObject *right) { Py_RETURN_NONE; }
@@ -157,9 +163,10 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->ready_wrapper_types = ready_wrapper_types;
     result->instruction = default_instruction;
     result->fork_notify = default_unary_notify;
-    result->fork_result = default_fork_result;
+    result->fork_result = default_notify_object_and_int;
     result->function_call = default_unary_notify;
     result->function_return = default_unary_notify;
+    result->unpack = default_notify_object_and_int;
     result->load_const = default_unary;
     result->create_list = default_create_collection;
     result->create_tuple = default_create_collection;
@@ -237,6 +244,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->approximation_list_richcompare = 0;
     result->approximation_range = 0;
     result->approximation_list_append = 0;
+    result->approximation_builtin_sum = 0;
     result->fixate_type = default_unary_notify;
     result->default_unary_handler = default_unary;
     result->default_binary_handler = default_binary;

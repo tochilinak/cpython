@@ -2966,6 +2966,13 @@ handle_eval_breaker:
             TOUCH_STACK(0, -1);
             PREDICTED(UNPACK_SEQUENCE);
             PyObject *seq = POP();
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (local_adapter) {
+                if (local_adapter->unpack(local_adapter->handler_param, get_symbolic_or_none(seq), oparg)) {
+                    Py_DECREF(seq);
+                    goto error;
+                }
+            }
             PyObject **top = stack_pointer + oparg;
             if (!unpack_iterable(tstate, seq, oparg, -1, top)) {
                 Py_DECREF(seq);

@@ -3090,3 +3090,7 @@ _PyBuiltin_Init(PyInterpreterState *interp)
 
 void *EXPORT_FOR_APPROXIMATION_BUILTIN_LEN = builtin_len;
 void *EXPORT_FOR_APPROXIMATION_BUILTIN_ISINSTANCE = builtin_isinstance;
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_MIN = builtin_min;
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_MAX = builtin_max;
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_ALL = builtin_all;
+void *EXPORT_FOR_APPROXIMATION_BUILTIN_SUM = builtin_sum;

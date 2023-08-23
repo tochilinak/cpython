@@ -3829,6 +3829,13 @@ _PyType_Lookup(PyTypeObject *type, PyObject *name)
     }
 
     /* We may end up clearing live exceptions below, so make sure it's ours. */
+    if (PyErr_Occurred()) {
+        PyErr_Print();
+        printf("params: %s\n", type->tp_name);
+        PyObject_Print(name, stdout, 0);
+        fflush(stdout);
+        assert(0);
+    }
     assert(!PyErr_Occurred());
 
     res = find_name_in_mro(type, name, &error);
