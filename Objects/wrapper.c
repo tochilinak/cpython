@@ -827,7 +827,15 @@ SLOT(nb_inplace_matrix_multiply)
 
 LEN_FUN_AS(sq_length, tp_as_sequence)
 SLOT(sq_length)
-BINARY_FUN_AS(sq_concat, tp_as_sequence, default_binary_handler_getter)
+
+static binary_handler
+get_sq_concat_handler(SymbolicAdapter *adapter, binaryfunc func) {
+    if (func == PyList_Type.tp_as_sequence->sq_concat)
+        return adapter->list_concat;
+    return adapter->default_binary_handler;
+}
+
+BINARY_FUN_AS(sq_concat, tp_as_sequence, get_sq_concat_handler)
 SLOT(sq_concat)
 
 SIZEARG_FUN_AS(sq_repeat, tp_as_sequence)
@@ -847,7 +855,15 @@ SIZEOBJARG_AS(sq_ass_item, tp_as_sequence)
 SLOT(sq_ass_item)
 OBJOBJ_AS(sq_contains, tp_as_sequence)
 SLOT(sq_contains)
-BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, default_binary_handler_getter)
+
+static binary_handler
+get_sq_inplace_concat_handler(SymbolicAdapter *adapter, binaryfunc func) {
+    if (func == PyList_Type.tp_as_sequence->sq_inplace_concat) {
+        return adapter->list_inplace_concat;
+    }
+    return adapter->default_binary_handler;
+}
+BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, get_sq_inplace_concat_handler)
 SLOT(sq_inplace_concat)
 
 SIZEARG_FUN_AS(sq_inplace_repeat, tp_as_sequence)

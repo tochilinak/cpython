@@ -48,6 +48,8 @@ typedef struct {
     PyObject *(*list_get_size)(void *, PyObject *list);
     PyObject *(*list_iter)(void *, PyObject *list);
     PyObject *(*list_iterator_next)(void *, PyObject *iterator);
+    PyObject *(*list_concat)(void *, PyObject *, PyObject *);
+    PyObject *(*list_inplace_concat)(void *, PyObject *, PyObject *);
     PyObject *(*tuple_iter)(void *, PyObject *tuple);
     PyObject *(*tuple_iterator_next)(void *, PyObject *iterator);
     PyObject *(*range_iter)(void *, PyObject *range);
@@ -101,6 +103,7 @@ typedef struct {
     PyObject *(*approximation_builtin_len)(PyObject *);
     PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);
     PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
+    PyObject *(*approximation_list_repeat)(PyObject *, PyObject *);
     PyObject *(*approximation_range)(void *adapter, PyObject *args);
     PyObject *(*approximation_list_append)(PyObject *append_method, PyObject *symbolic_list, PyObject *wrapped_elem);
     PyObject *(*approximation_builtin_sum)(PyObject *);

@@ -191,6 +191,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->list_get_size = default_unary;
     result->list_iter = default_unary;
     result->list_iterator_next = default_unary;
+    result->list_concat = default_binary;
+    result->list_inplace_concat = default_binary;
     result->tuple_iter = default_unary;
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
@@ -242,6 +244,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;
     result->approximation_list_richcompare = 0;
+    result->approximation_list_repeat = 0;
     result->approximation_range = 0;
     result->approximation_list_append = 0;
     result->approximation_builtin_sum = 0;
