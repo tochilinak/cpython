@@ -24,6 +24,7 @@ typedef struct {
     int (*function_call)(void *, PyObject *code);
     int (*function_return)(void *, PyObject *code);
     int (*unpack)(void *, PyObject *iterable, int count);
+    int (*is_op)(void *, PyObject *left, PyObject *right);
     PyObject *(*load_const)(void *, PyObject *obj);
     PyObject *(*create_list)(void *, PyObject **elems);
     PyObject *(*create_tuple)(void *, PyObject **elems);

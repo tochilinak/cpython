@@ -4103,6 +4103,11 @@ handle_eval_breaker:
         }
 
         TARGET(IS_OP) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (local_adapter) {
+                if (local_adapter->is_op(local_adapter->handler_param, get_symbolic_or_none(PEEK(1)), get_symbolic_or_none(PEEK(2))))
+                    goto error;
+            }
             TOUCH_STACK(2, -1);
             PyObject *right = POP();
             PyObject *left = TOP();
