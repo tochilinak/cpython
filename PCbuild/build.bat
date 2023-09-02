@@ -64,6 +64,8 @@ set verbose=/nologo /v:m /clp:summary
 set kill=
 set do_pgo=
 set pgo_job=-m test --pgo
+set generate_layout=
+set layout_dst=
 
 :CheckOpts
 if "%~1"=="-h" goto Usage
@@ -91,6 +93,7 @@ if "%~1"=="-E" (set IncludeExternals=false) & shift & goto CheckOpts
 if "%~1"=="--no-ctypes" (set IncludeCTypes=false) & shift & goto CheckOpts
 if "%~1"=="--no-ssl" (set IncludeSSL=false) & shift & goto CheckOpts
 if "%~1"=="--no-tkinter" (set IncludeTkinter=false) & shift & goto CheckOpts
+if "%~1"=="--generate-layout" (set generate_layout=true) & (set layout_dst=%2) & shift & shift & goto CheckOpts
 
 if "%IncludeExternals%"=="" set IncludeExternals=true
 if "%IncludeCTypes%"=="" set IncludeCTypes=true
@@ -176,6 +179,14 @@ echo on
  %1 %2 %3 %4 %5 %6 %7 %8 %9
 
 @echo off
+
+if "%generate_layout%"=="true" (
+    echo Destination %layout_dst%
+    echo on
+    %dir%\..\PCBuild\amd64\python_d.exe %dir%\..\PC\layout\main.py --include-dev --include-symbols --include-pip -d --copy %layout_dst% -s %dir%\.. -v
+    @echo off
+)
+
 exit /b %ERRORLEVEL%
 
 :Version

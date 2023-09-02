@@ -163,6 +163,8 @@
     <ClCompile Include="..\Objects\unicodeobject.c" />
     <ClCompile Include="..\Objects\unionobject.c" />
     <ClCompile Include="..\Objects\weakrefobject.c" />
+    <ClCompile Include="..\Objects\wrapper.c" />
+    <ClCompile Include="..\Objects\symbolicadapter.c" />
     <ClCompile Include="..\Parser\myreadline.c" />
     <ClCompile Include="..\Parser\parser.c" />
     <ClCompile Include="..\Parser\peg_api.c" />

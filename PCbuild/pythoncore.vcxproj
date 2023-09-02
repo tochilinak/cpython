@@ -298,6 +298,9 @@
     <ClInclude Include="..\Include\tupleobject.h" />
     <ClInclude Include="..\Include\unicodeobject.h" />
     <ClInclude Include="..\Include\weakrefobject.h" />
+    <ClInclude Include="..\Include\wrapper.h" />
+    <ClInclude Include="..\Include\symbolicadapter.h" />
+    <ClInclude Include="..\Include\approximation_defs.h" />
     <ClInclude Include="..\Modules\_math.h" />
     <ClInclude Include="..\Modules\hashtable.h" />
     <ClInclude Include="..\Modules\rotatingtree.h" />
@@ -461,6 +464,8 @@
     <ClCompile Include="..\Objects\unicodeobject.c" />
     <ClCompile Include="..\Objects\unionobject.c" />
     <ClCompile Include="..\Objects\weakrefobject.c" />
+    <ClCompile Include="..\Objects\wrapper.c" />
+    <ClCompile Include="..\Objects\symbolicadapter.c" />
     <ClCompile Include="..\Parser\myreadline.c" />
     <ClCompile Include="..\Parser\tokenizer.c" />
     <ClCompile Include="..\Parser\token.c" />
