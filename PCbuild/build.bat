@@ -183,7 +183,7 @@ echo on
 if "%generate_layout%"=="true" (
     echo Destination %layout_dst%
     echo on
-    %dir%\..\PCBuild\amd64\python_d.exe %dir%\..\PC\layout\main.py --include-dev --include-symbols --include-pip -d --copy %layout_dst% -s %dir%\.. -v
+    %dir%\..\PCBuild\amd64\python.exe %dir%\..\PC\layout\main.py --include-dev --include-pip --copy %layout_dst% --temp %dir%\layout_tmp
     @echo off
 )
 
