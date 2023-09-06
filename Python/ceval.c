@@ -4360,6 +4360,11 @@ handle_eval_breaker:
         }
 
         TARGET(POP_JUMP_BACKWARD_IF_NOT_NONE) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = get_symbolic_or_none(TOP());
+            if (local_adapter) {
+                if (local_adapter->none_check(local_adapter->handler_param, symbolic)) goto error;
+            }
             TOUCH_STACK(1, -1);
             PyObject *value = POP();
             if (!Py_IsNone(value)) {
@@ -4373,6 +4378,11 @@ handle_eval_breaker:
         }
 
         TARGET(POP_JUMP_FORWARD_IF_NOT_NONE) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = get_symbolic_or_none(TOP());
+            if (local_adapter) {
+                if (local_adapter->none_check(local_adapter->handler_param, symbolic)) goto error;
+            }
             TOUCH_STACK(1, -1);
             PyObject *value = POP();
             if (!Py_IsNone(value)) {
@@ -4383,6 +4393,11 @@ handle_eval_breaker:
         }
 
         TARGET(POP_JUMP_BACKWARD_IF_NONE) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = get_symbolic_or_none(TOP());
+            if (local_adapter) {
+                if (local_adapter->none_check(local_adapter->handler_param, symbolic)) goto error;
+            }
             TOUCH_STACK(1, -1);
             PyObject *value = POP();
             if (Py_IsNone(value)) {
@@ -4397,6 +4412,11 @@ handle_eval_breaker:
         }
 
         TARGET(POP_JUMP_FORWARD_IF_NONE) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = get_symbolic_or_none(TOP());
+            if (local_adapter) {
+                if (local_adapter->none_check(local_adapter->handler_param, symbolic)) goto error;
+            }
             TOUCH_STACK(1, -1);
             PyObject *value = POP();
             if (Py_IsNone(value)) {

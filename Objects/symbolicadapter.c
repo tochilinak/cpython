@@ -167,6 +167,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->function_call = default_unary_notify;
     result->function_return = default_unary_notify;
     result->unpack = default_notify_object_and_int;
+    result->is_op = default_binary_notify;
+    result->none_check = default_unary_notify;
     result->load_const = default_unary;
     result->create_list = default_create_collection;
     result->create_tuple = default_create_collection;
