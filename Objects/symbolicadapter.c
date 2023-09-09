@@ -47,7 +47,10 @@ SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *
             PyErr_SetString(PyExc_TypeError, "all arguments must be pairs (concrete, symbolic)");
             return 0;
         }
-        PyTuple_SET_ITEM(wrappers, i, wrap(PyTuple_GetItem(cur, 0), PyTuple_GetItem(cur, 1), adapter));
+        PyObject *concrete = PyTuple_GetItem(cur, 0);
+        PyObject *symbolic = PyTuple_GetItem(cur, 1);
+        PyObject *wrapped = wrap(concrete, symbolic, adapter);
+        PyTuple_SET_ITEM(wrappers, i, wrapped);
     }
 
     PyGILState_STATE gil = PyGILState_Ensure();

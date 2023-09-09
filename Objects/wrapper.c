@@ -1040,7 +1040,7 @@ create_new_wrapper_type(PyObject *concrete) {
             slots
     };
     PyTypeObject *result = (PyTypeObject*) PyType_FromSpec(&spec);
-    PyMem_Free(slots);
+    PyMem_RawFree(slots);
     return result;
 }
 
