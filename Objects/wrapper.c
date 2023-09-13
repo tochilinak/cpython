@@ -307,7 +307,7 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         PyErr_SetString(PyExc_TypeError, "no tp_call");
         return 0;
     }
-    PyObject *symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, concrete_o1, 0);
+    PyObject *symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, symbolic_o1, 0);
     if (!symbolic_result) return 0;
     if (symbolic_result == Py_None) {
         if (PyCFunction_Check(concrete_self)) {
