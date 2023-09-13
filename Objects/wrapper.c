@@ -307,7 +307,10 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         PyErr_SetString(PyExc_TypeError, "no tp_call");
         return 0;
     }
+    PyObject *concrete_result = Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2);
     PyObject *symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, symbolic_o1, 0);
+    Py_XDECREF(concrete_o1);
+    Py_XDECREF(symbolic_o1);
     if (!symbolic_result) return 0;
     if (symbolic_result == Py_None) {
         if (PyCFunction_Check(concrete_self)) {
@@ -325,7 +328,7 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         }
         if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
     }
-    return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), symbolic_result, adapter);
+    return wrap(concrete_result, symbolic_result, adapter);
 }
 SLOT(tp_call)
 
