@@ -4785,6 +4785,12 @@ handle_eval_breaker:
             PREDICTED(LOAD_METHOD);
             /* Designed to work in tandem with PRECALL. */
             PyObject *name = GETITEM(names, oparg);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (local_adapter) {
+                PyObject *symbolic_name = local_adapter->load_const(local_adapter->handler_param, name);
+                if (!symbolic_name) goto error;
+                name = wrap(name, symbolic_name, local_adapter);
+            }
             PyObject *obj = TOP();
             PyObject *meth = NULL;
 

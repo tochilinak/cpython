@@ -15,7 +15,6 @@ typedef struct {
     PyObject_HEAD
     void *handler_param;
     PyObject *ready_wrapper_types;
-    PyObject *c_function_owner_map;
     int ignore;
     void *inside_wrapper_tp_call;
     int (*instruction)(void *, PyFrameObject *frame);
@@ -26,6 +25,8 @@ typedef struct {
     int (*unpack)(void *, PyObject *iterable, int count);
     int (*is_op)(void *, PyObject *left, PyObject *right);
     int (*none_check)(void *, PyObject *on);
+    PyObject *(*symbolic_tp_call)(void *, PyObject *on, PyObject *args, PyObject *kwargs);
+    PyObject *(*standard_tp_getattro)(void *, PyObject *obj, PyObject *name);
     PyObject *(*load_const)(void *, PyObject *obj);
     PyObject *(*create_list)(void *, PyObject **elems);
     PyObject *(*create_tuple)(void *, PyObject **elems);
@@ -107,7 +108,6 @@ typedef struct {
     PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
     PyObject *(*approximation_list_repeat)(PyObject *, PyObject *);
     PyObject *(*approximation_range)(void *adapter, PyObject *args);
-    PyObject *(*approximation_list_append)(PyObject *append_method, PyObject *symbolic_list, PyObject *wrapped_elem);
     PyObject *(*approximation_builtin_sum)(PyObject *);
     int (*fixate_type)(void *, PyObject *);
     unary_handler default_unary_handler;

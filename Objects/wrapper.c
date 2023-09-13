@@ -97,21 +97,27 @@ tp_getattro(PyObject *self, PyObject *other) {
 
     PyObject *concrete_other = unwrap(other);
     SymbolicAdapter *adapter = get_adapter(self);
+    PyObject *symbolic_self = get_symbolic_or_none(self);
+    PyObject *symbolic_other = get_symbolic_or_none(other);
     assert(adapter != 0);
-    if (adapter->lost_symbolic_value(adapter->handler_param, "tp_getattro")) return 0;
 
     PyObject *concrete_result = concrete_self->ob_type->tp_getattro(concrete_self, concrete_other);
     if (!concrete_result)
         return 0;
 
-    PyObject *symbolic_self = get_symbolic_or_none(self);
-
-    if (PyCFunction_Check(concrete_result) && ((PyCFunctionObject *) concrete_result)->m_self == concrete_self &&
-        !PyDict_GetItem(adapter->c_function_owner_map, concrete_result)) {
-        PyDict_SetItem(adapter->c_function_owner_map, concrete_result, symbolic_self);
+    PyObject *symbolic_result = Py_None;
+    if (concrete_self->ob_type->tp_getattro == PyObject_GenericGetAttr) {
+        if (adapter->fixate_type(adapter->handler_param, symbolic_self)) return 0;
+        symbolic_result = adapter->standard_tp_getattro(adapter->handler_param, symbolic_self, symbolic_other);
+        if (!symbolic_result) return 0;
     }
 
-    return wrap(concrete_result, Py_None, adapter);
+    if (symbolic_result == Py_None) {
+        sprintf(adapter->msg_buffer, "tp_getattro on %s", Py_TYPE(self)->tp_name);
+        if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
+    }
+
+    return wrap(concrete_result, symbolic_result, adapter);
 }
 SLOT(tp_getattro)
 
@@ -212,17 +218,7 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
     if (!PyCFunction_Check(original))
         return 0;
     void *c_method = ((PyCFunctionObject *) original)->m_ml->ml_meth;
-    if (c_method == EXPORT_FOR_APPROXIMATION_LIST_APPEND && adapter->approximation_list_append) {
-        if (o2 || !PyTuple_Check(o1) || PyTuple_GET_SIZE(o1) != 1)
-            return 0;
-        PyObject *symbolic_owner = PyDict_GetItem(adapter->c_function_owner_map, original);
-        if (!symbolic_owner)
-            return 0;
-        PyObject *wrapped_elem = PyTuple_GetItem(o1, 0);
-        *called_approximation = 1;
-        return adapter->approximation_list_append(original, symbolic_owner, wrapped_elem);
-
-    } else if (c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_LEN && adapter->approximation_builtin_len) {
+    if (c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_LEN && adapter->approximation_builtin_len) {
         if (o2 || !PyTuple_Check(o1) || PyTuple_GET_SIZE(o1) != 1)
             return 0;
         PyObject *obj = PyTuple_GetItem(o1, 0);
@@ -257,6 +253,7 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
 static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     PyObject *concrete_self = unwrap(self);
+    PyObject *symbolic_self = get_symbolic_or_none(self);
     SymbolicAdapter *adapter = get_adapter(self);
     assert(adapter != 0);
     assert(PyTuple_Check(o1));
@@ -280,14 +277,21 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         return r;
 
     PyObject *concrete_o1 = 0;
+    PyObject *symbolic_o1 = 0;
     if (o1) {
         concrete_o1 = PyTuple_New(PyTuple_GET_SIZE(o1));
+        symbolic_o1 = PyTuple_New(PyTuple_GET_SIZE(o1));
         for (int i = 0; i < PyTuple_GET_SIZE(o1); i++) {
-            PyObject *concrete = unwrap(PyTuple_GetItem(o1, i));
+            PyObject *wrapped = PyTuple_GetItem(o1, i);
+            PyObject *concrete = unwrap(wrapped);
+            PyObject *symbolic = get_symbolic_or_none(wrapped);
             Py_XINCREF(concrete);
+            Py_XINCREF(symbolic);
             PyTuple_SetItem(concrete_o1, i, concrete);
+            PyTuple_SetItem(symbolic_o1, i, symbolic);
         }
     }
+    // TODO: symbolic o2
     if (o2) {
         Py_ssize_t pos = 0;
         PyObject *key = 0, *value = 0;
@@ -303,19 +307,25 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         PyErr_SetString(PyExc_TypeError, "no tp_call");
         return 0;
     }
-    if (PyCFunction_Check(concrete_self)) {
-        const char *owner = "<null>";
-        if (((PyCFunctionObject *) concrete_self)->m_self) {
-            owner = Py_TYPE(((PyCFunctionObject *) concrete_self)->m_self)->tp_name;
+    PyObject *symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, concrete_o1, 0);
+    if (!symbolic_result) return 0;
+    if (symbolic_result == Py_None) {
+        if (PyCFunction_Check(concrete_self)) {
+            const char *owner = "<null>";
+            if (((PyCFunctionObject *) concrete_self)->m_self) {
+                owner = Py_TYPE(((PyCFunctionObject *) concrete_self)->m_self)->tp_name;
+            }
+            sprintf(adapter->msg_buffer, "Built-in method %s of %s",
+                    ((PyCFunctionObject *) concrete_self)->m_ml->ml_name, owner);
+        } else if (PyType_Check(concrete_self)) {
+            sprintf(adapter->msg_buffer, "Call of type %s", ((PyTypeObject *) concrete_self)->tp_name);
+        } else {
+            sprintf(adapter->msg_buffer, "Some callable of type %s at %p", Py_TYPE(concrete_self)->tp_name,
+                    concrete_self);
         }
-        sprintf(adapter->msg_buffer, "Built-in method %s of %s", ((PyCFunctionObject *) concrete_self)->m_ml->ml_name, owner);
-    } else if (PyType_Check(concrete_self)) {
-        sprintf(adapter->msg_buffer, "Call of type %s", ((PyTypeObject *) concrete_self)->tp_name);
-    } else {
-        sprintf(adapter->msg_buffer, "Some callable of type %s at %p", Py_TYPE(concrete_self)->tp_name, concrete_self);
+        if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
     }
-    if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
-    return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), 0, adapter);
+    return wrap(Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2), symbolic_result, adapter);
 }
 SLOT(tp_call)
 
