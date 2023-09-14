@@ -3703,6 +3703,12 @@ handle_eval_breaker:
             TOUCH_STACK(0, -1);
             PREDICTED(LOAD_ATTR);
             PyObject *name = GETITEM(names, oparg);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (local_adapter) {
+                PyObject *symbolic_name = local_adapter->load_const(local_adapter->handler_param, name);
+                if (!symbolic_name) goto error;
+                name = wrap(name, symbolic_name, local_adapter);
+            }
             PyObject *owner = TOP();
             PyObject *res = PyObject_GetAttr(owner, name);
             if (res == NULL) {
@@ -5780,6 +5786,17 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_SLICE) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = Py_None;
+            if (local_adapter) {
+                PyObject *s_start = Py_None, *s_stop = Py_None, *s_step = Py_None;
+                if (oparg == 3)
+                    s_step = get_symbolic_or_none(PEEK(1));
+                s_stop = get_symbolic_or_none(PEEK(1 + (oparg == 3)));
+                s_start = get_symbolic_or_none(PEEK(2 + (oparg == 3)));
+                symbolic = local_adapter->create_slice(local_adapter->handler_param, s_start, s_stop, s_step);
+                if (!symbolic) goto error;
+            }
             TOUCH_STACK(2 + (oparg == 3), -1);
             PyObject *start, *stop, *step, *slice;
             if (oparg == 3)
@@ -5789,6 +5806,9 @@ handle_eval_breaker:
             stop = POP();
             start = TOP();
             slice = PySlice_New(start, stop, step);
+            if (local_adapter) {
+                slice = wrap(slice, symbolic, local_adapter);
+            }
             Py_DECREF(start);
             Py_DECREF(stop);
             Py_XDECREF(step);

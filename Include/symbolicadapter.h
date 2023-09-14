@@ -31,6 +31,7 @@ typedef struct {
     PyObject *(*create_list)(void *, PyObject **elems);
     PyObject *(*create_tuple)(void *, PyObject **elems);
     PyObject *(*create_range)(void *, PyObject *start, PyObject *stop, PyObject *step);
+    PyObject *(*create_slice)(void *, PyObject *start, PyObject *stop, PyObject *step);
     PyObject *(*gt_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*lt_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*eq_long)(void *, PyObject *left, PyObject *right);
@@ -91,12 +92,14 @@ typedef struct {
     int (*mp_subscript)(void *, PyObject *storage, PyObject *index);
     int (*mp_ass_subscript)(void *, PyObject *storage, PyObject *index, PyObject *value);
     int (*tp_richcompare)(void *, int op, PyObject *left, PyObject *right);
+    int (*tp_getattro)(void *, PyObject *on, PyObject *name);
     int (*tp_iter)(void *, PyObject *);
     int (*tp_iternext)(void *, PyObject *);
     PyObject *(*symbolic_virtual_unary_fun)(void *, PyObject *);
     PyObject *(*symbolic_virtual_binary_fun)(void *, PyObject *left, PyObject *right);
     int (*lost_symbolic_value)(void *, const char *description);
     void *virtual_tp_richcompare;
+    void *virtual_tp_getattro;
     void *virtual_tp_iter;
     void *virtual_nb_add;
     void *virtual_nb_subtract;

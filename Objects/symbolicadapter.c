@@ -176,6 +176,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->create_list = default_create_collection;
     result->create_tuple = default_create_collection;
     result->create_range = default_ternary;
+    result->create_slice = default_ternary;
     result->gt_long = default_binary;
     result->lt_long = default_binary;
     result->eq_long = default_binary;
@@ -235,12 +236,14 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->mp_subscript = default_binary_notify;
     result->mp_ass_subscript = default_ternary_notify;
     result->tp_richcompare = default_tp_richcompare;
+    result->tp_getattro = default_binary_notify;
     result->tp_iter = default_unary_notify;
     result->tp_iternext = default_unary_notify;
     result->symbolic_virtual_unary_fun = default_unary;
     result->symbolic_virtual_binary_fun = default_binary;
     result->lost_symbolic_value = default_lost_symbolic_value;
     result->virtual_tp_richcompare = 0;
+    result->virtual_tp_getattro = 0;
     result->virtual_tp_iter = 0;
     result->virtual_nb_add = 0;
     result->virtual_nb_subtract = 0;
