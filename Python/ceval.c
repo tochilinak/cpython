@@ -5792,10 +5792,17 @@ handle_eval_breaker:
                 PyObject *s_start = Py_None, *s_stop = Py_None, *s_step = Py_None;
                 if (oparg == 3)
                     s_step = get_symbolic_or_none(PEEK(1));
+                else {
+                    s_step = local_adapter->load_const(local_adapter->handler_param, Py_None);
+                    if (!s_step) goto error;
+                }
                 s_stop = get_symbolic_or_none(PEEK(1 + (oparg == 3)));
                 s_start = get_symbolic_or_none(PEEK(2 + (oparg == 3)));
                 symbolic = local_adapter->create_slice(local_adapter->handler_param, s_start, s_stop, s_step);
                 if (!symbolic) goto error;
+                if (symbolic == Py_None)
+                    if (local_adapter->lost_symbolic_value(local_adapter->handler_param, "build_slice"))
+                        goto error;
             }
             TOUCH_STACK(2 + (oparg == 3), -1);
             PyObject *start, *stop, *step, *slice;

@@ -47,7 +47,6 @@ tp_dealloc(PyObject *op) {
 }
 SLOT(tp_dealloc)
 
-
 static PyObject *
 tp_getattr(PyObject *self, char *attr) {
     PyObject *concrete_self = unwrap(self);
@@ -65,7 +64,7 @@ tp_setattr(PyObject *self, char *attr, PyObject *value) {
 }
 SLOT(tp_setattr)
 
-// better not to wrap: may be special method (like __repr__). This method is used in namedtuple
+// better not to wrap: may be a special method (like __repr__). This method is used in namedtuple
 static PyObject *
 tp_descr_get(PyObject *self, PyObject *obj, PyObject *type) {
     PyObject *concrete_self = unwrap(self);
@@ -474,14 +473,18 @@ SLOT(tp_hash)
                                         return wrap(concrete_result, symbolic, adapter); \
                                     }
 
-#define BINARY_FUN_AS(func, tp_as, handler_getter) \
+#define BINARY_FUN_AS(func, tp_as, handler_getter, approximation) \
                                     static PyObject * \
                                     func(PyObject *self, PyObject *other) \
                                     { \
                                         SymbolicAdapter *adapter = get_adapter(self); \
                                         if (!adapter) \
                                             adapter = get_adapter(other); \
-                                        assert(adapter != 0);             \
+                                        assert(adapter != 0); \
+                                        int approximated; \
+                                        PyObject *r = approximation(adapter, self, other, &approximated); \
+                                        if (approximated) \
+                                            return r; \
                                         if (adapter->func(adapter->handler_param, get_symbolic_or_none(self), get_symbolic_or_none(other))) return 0; \
                                         PyObject *concrete_self = unwrap(self); \
                                         PyObject *concrete_other = unwrap(other); \
@@ -640,6 +643,12 @@ default_binary_handler_getter(SymbolicAdapter *adapter, void *func) {
     return adapter->default_binary_handler;
 }
 
+static PyObject *
+default_binary_approximation(SymbolicAdapter *adapter, PyObject *o1, PyObject *o2, int *approximated) {
+    *approximated = 0;
+    return 0;
+}
+
 static ternary_handler
 default_ternary_handler_getter(SymbolicAdapter *adapter, void *func) {
     return adapter->default_ternary_handler;
@@ -653,7 +662,7 @@ get_nb_add_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_handler)
+BINARY_FUN_AS(nb_add, tp_as_number, get_nb_add_handler, default_binary_approximation)
 SLOT(nb_add)
 
 static binary_handler
@@ -664,7 +673,7 @@ get_nb_sub_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_handler)
+BINARY_FUN_AS(nb_subtract, tp_as_number, get_nb_sub_handler, default_binary_approximation)
 SLOT(nb_subtract)
 
 static binary_handler
@@ -675,7 +684,7 @@ get_nb_mult_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_handler)
+BINARY_FUN_AS(nb_multiply, tp_as_number, get_nb_mult_handler, default_binary_approximation)
 SLOT(nb_multiply)
 
 static binary_handler
@@ -684,10 +693,10 @@ get_nb_rem_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->rem_long;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_remainder, tp_as_number, get_nb_rem_handler)
+BINARY_FUN_AS(nb_remainder, tp_as_number, get_nb_rem_handler, default_binary_approximation)
 SLOT(nb_remainder)
 
-BINARY_FUN_AS(nb_divmod, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_divmod, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_divmod)
 
 static ternary_handler
@@ -734,15 +743,15 @@ SLOT(nb_bool)
 
 UNARY_FUN_AS(nb_invert, tp_as_number, default_unary_handler_getter)
 SLOT(nb_invert)
-BINARY_FUN_AS(nb_lshift, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_lshift, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_lshift)
-BINARY_FUN_AS(nb_rshift, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_rshift, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_rshift)
-BINARY_FUN_AS(nb_and, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_and, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_and)
-BINARY_FUN_AS(nb_xor, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_xor, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_xor)
-BINARY_FUN_AS(nb_or, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_or, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_or)
 
 // must return int
@@ -780,25 +789,25 @@ nb_float(PyObject *self) {
 }
 SLOT(nb_float)
 
-BINARY_FUN_AS(nb_inplace_add, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_add, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_add)
-BINARY_FUN_AS(nb_inplace_subtract, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_subtract, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_subtract)
-BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_multiply, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_multiply)
-BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_remainder, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_remainder)
 TERNARY_FUN_AS(nb_inplace_power, tp_as_number, default_ternary_handler_getter)
 SLOT(nb_inplace_power)
-BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_lshift, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_lshift)
-BINARY_FUN_AS(nb_inplace_rshift, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_rshift, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_rshift)
-BINARY_FUN_AS(nb_inplace_and, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_and, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_and)
-BINARY_FUN_AS(nb_inplace_xor, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_xor, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_xor)
-BINARY_FUN_AS(nb_inplace_or, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_or, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_or)
 
 static binary_handler
@@ -807,14 +816,14 @@ get_nb_floor_div_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->div_long;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_handler)
+BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_handler, default_binary_approximation)
 SLOT(nb_floor_divide)
 
-BINARY_FUN_AS(nb_true_divide, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_true_divide, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_true_divide)
-BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_floor_divide)
-BINARY_FUN_AS(nb_inplace_true_divide, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_true_divide, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_true_divide)
 
 // must return integer
@@ -839,9 +848,9 @@ get_nb_matrix_multiply_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, get_nb_matrix_multiply_handler)
+BINARY_FUN_AS(nb_matrix_multiply, tp_as_number, get_nb_matrix_multiply_handler, default_binary_approximation)
 SLOT(nb_matrix_multiply)
-BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_binary_handler_getter)
+BINARY_FUN_AS(nb_inplace_matrix_multiply, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_matrix_multiply)
 
 LEN_FUN_AS(sq_length, tp_as_sequence)
@@ -854,7 +863,7 @@ get_sq_concat_handler(SymbolicAdapter *adapter, binaryfunc func) {
     return adapter->default_binary_handler;
 }
 
-BINARY_FUN_AS(sq_concat, tp_as_sequence, get_sq_concat_handler)
+BINARY_FUN_AS(sq_concat, tp_as_sequence, get_sq_concat_handler, default_binary_approximation)
 SLOT(sq_concat)
 
 SIZEARG_FUN_AS(sq_repeat, tp_as_sequence)
@@ -882,7 +891,7 @@ get_sq_inplace_concat_handler(SymbolicAdapter *adapter, binaryfunc func) {
     }
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, get_sq_inplace_concat_handler)
+BINARY_FUN_AS(sq_inplace_concat, tp_as_sequence, get_sq_inplace_concat_handler, default_binary_approximation)
 SLOT(sq_inplace_concat)
 
 SIZEARG_FUN_AS(sq_inplace_repeat, tp_as_sequence)
@@ -899,7 +908,16 @@ get_mp_subscript_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
 }
-BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_handler)
+static PyObject *
+mp_subscript_approximation(SymbolicAdapter *adapter, PyObject *self, PyObject *other, int *approximated) {
+    if (Py_TYPE(unwrap(self)) == &PyList_Type && Py_TYPE(unwrap(other)) == &PySlice_Type && adapter->approximation_list_slice_get_item) {
+        *approximated = 1;
+        return adapter->approximation_list_slice_get_item(self, other);
+    }
+    *approximated = 0;
+    return 0;
+}
+BINARY_FUN_AS(mp_subscript, tp_as_mapping, get_mp_subscript_handler, mp_subscript_approximation)
 SLOT(mp_subscript)
 
 static ternary_notify

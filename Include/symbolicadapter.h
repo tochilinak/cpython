@@ -110,6 +110,7 @@ typedef struct {
     PyObject *(*approximation_builtin_isinstance)(PyObject *, PyObject *);
     PyObject *(*approximation_list_richcompare)(PyObject *, PyObject *, int op);
     PyObject *(*approximation_list_repeat)(PyObject *, PyObject *);
+    PyObject *(*approximation_list_slice_get_item)(PyObject *, PyObject *);
     PyObject *(*approximation_range)(void *adapter, PyObject *args);
     PyObject *(*approximation_builtin_sum)(PyObject *);
     int (*fixate_type)(void *, PyObject *);

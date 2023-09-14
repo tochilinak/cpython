@@ -253,6 +253,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->approximation_builtin_isinstance = 0;
     result->approximation_list_richcompare = 0;
     result->approximation_list_repeat = 0;
+    result->approximation_list_slice_get_item = 0;
     result->approximation_range = 0;
     result->approximation_builtin_sum = 0;
     result->fixate_type = default_unary_notify;
