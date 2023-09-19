@@ -904,6 +904,8 @@ static binary_handler
 get_mp_subscript_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyList_Type.tp_as_mapping->mp_subscript)
         return adapter->list_get_item;
+    if (func == PyTuple_Type.tp_as_mapping->mp_subscript)
+        return adapter->tuple_get_item;
     if (func == adapter->virtual_mp_subscript)
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;

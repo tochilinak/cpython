@@ -199,6 +199,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->list_iterator_next = default_unary;
     result->list_concat = default_binary;
     result->list_inplace_concat = default_binary;
+    result->tuple_get_size = default_unary;
+    result->tuple_get_item = default_binary;
     result->tuple_iter = default_unary;
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;

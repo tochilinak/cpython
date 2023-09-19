@@ -54,6 +54,8 @@ typedef struct {
     PyObject *(*list_iterator_next)(void *, PyObject *iterator);
     PyObject *(*list_concat)(void *, PyObject *, PyObject *);
     PyObject *(*list_inplace_concat)(void *, PyObject *, PyObject *);
+    PyObject *(*tuple_get_size)(void *, PyObject *tuple);
+    PyObject *(*tuple_get_item)(void *, PyObject *tuple, PyObject *index);
     PyObject *(*tuple_iter)(void *, PyObject *tuple);
     PyObject *(*tuple_iterator_next)(void *, PyObject *iterator);
     PyObject *(*range_iter)(void *, PyObject *range);
