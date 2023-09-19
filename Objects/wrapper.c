@@ -118,7 +118,7 @@ tp_getattro(PyObject *self, PyObject *other) {
     }
 
     if (symbolic_result == Py_None) {
-        sprintf(adapter->msg_buffer, "tp_getattro on %s", Py_TYPE(self)->tp_name);
+        sprintf(adapter->msg_buffer, "tp_getattro on %s", Py_TYPE(concrete_self)->tp_name);
         if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
     }
 
