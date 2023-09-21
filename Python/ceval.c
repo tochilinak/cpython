@@ -3228,6 +3228,13 @@ handle_eval_breaker:
             /* Skip over inline cache */
             JUMPBY(INLINE_CACHE_ENTRIES_LOAD_GLOBAL);
             STACK_GROW(push_null);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter);
+            if (local_adapter) {
+                PyObject *symbolic = PyDict_GetItem(local_adapter->global_symbolic_clones_dict, name);
+                if (!symbolic)
+                    symbolic = Py_None;
+                v = wrap(v, symbolic, local_adapter);
+            }
             PUSH(v);
             DISPATCH();
         }

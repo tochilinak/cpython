@@ -15,6 +15,7 @@ typedef struct {
     PyObject_HEAD
     void *handler_param;
     PyObject *ready_wrapper_types;
+    PyObject *global_symbolic_clones_dict;
     int ignore;
     void *inside_wrapper_tp_call;
     int (*instruction)(void *, PyFrameObject *frame);
@@ -71,6 +72,7 @@ typedef struct {
     PyObject *(*range_iter)(void *, PyObject *range);
     PyObject *(*range_iterator_next)(void *, PyObject *iterator);
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
+    PyObject *(*symbolic_int_cast)(void *, PyObject *);
     int (*nb_add)(void *, PyObject *left, PyObject *right);
     int (*nb_subtract)(void *, PyObject *left, PyObject *right);
     int (*nb_multiply)(void *, PyObject *left, PyObject *right);
@@ -136,7 +138,7 @@ typedef struct {
 #include "wrapper.h"
 
 PyAPI_FUNC(int) register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter);
-PyAPI_FUNC(SymbolicAdapter*) create_new_adapter(void *param);
+PyAPI_FUNC(SymbolicAdapter*) create_new_adapter(void *param, PyObject *global_symbolic_clones_dict);
 PyAPI_FUNC(PyObject*) SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args, runnable before_call, runnable after_call);
 int SymbolicAdapter_CheckExact(PyObject *obj);
 

@@ -8,6 +8,7 @@ static void
 adapter_dealloc(PyObject *op) {
     SymbolicAdapter *adapter = (SymbolicAdapter *) op;
     Py_DECREF(adapter->ready_wrapper_types);
+    Py_DECREF(adapter->global_symbolic_clones_dict);
     Py_TYPE(op)->tp_free(op);
 }
 
@@ -155,9 +156,11 @@ static int default_set_item(void *arg, PyObject *storage, PyObject *index, PyObj
 static int default_lost_symbolic_value(void *arg, const char *description) { return 0; }
 
 static SymbolicAdapter *
-create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
+create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clones_dict, void *handler_param) {
     SymbolicAdapter *result = PyObject_New(SymbolicAdapter, &SymbolicAdapter_Type);
     Py_INCREF(ready_wrapper_types);
+    result->global_symbolic_clones_dict = global_symbolic_clones_dict;
+    Py_INCREF(global_symbolic_clones_dict);
     result->ignore = 0;
     result->inside_wrapper_tp_call = 0;
     result->handler_param = handler_param;
@@ -215,6 +218,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
+    result->symbolic_int_cast = default_unary;
     result->nb_add = default_binary_notify;
     result->nb_subtract = default_binary_notify;
     result->nb_multiply = default_binary_notify;
@@ -277,9 +281,9 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
 }
 
 SymbolicAdapter *
-create_new_adapter(void *param) {
+create_new_adapter(void *param, PyObject *global_symbolic_clones_dict) {
     PyObject *ready_wrapper_types = PyDict_New();
-    return create_new_adapter_(ready_wrapper_types, param);
+    return create_new_adapter_(ready_wrapper_types, global_symbolic_clones_dict, param);
 }
 
 int
