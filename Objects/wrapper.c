@@ -174,6 +174,13 @@ tp_richcompare_handler_getter(SymbolicAdapter *adapter, richcmpfunc fun, int op)
         if (op == Py_LE) return adapter->le_long;
     } else if (fun == adapter->virtual_tp_richcompare) {
         return adapter->symbolic_virtual_binary_fun;
+    } else if (fun == PyFloat_Type.tp_richcompare) {
+        if (op == Py_GT) return adapter->gt_float;
+        if (op == Py_LT) return adapter->lt_float;
+        if (op == Py_EQ) return adapter->eq_float;
+        if (op == Py_NE) return adapter->ne_float;
+        if (op == Py_GE) return adapter->ge_float;
+        if (op == Py_LE) return adapter->le_float;
     }
     return adapter->default_binary_handler;
 }
@@ -658,6 +665,8 @@ static binary_handler
 get_nb_add_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_add)
         return adapter->add_long;
+    if (func == PyFloat_Type.tp_as_number->nb_add)
+        return adapter->add_float;
     if (func == adapter->virtual_nb_add)
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
@@ -669,6 +678,8 @@ static binary_handler
 get_nb_sub_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_subtract)
         return adapter->sub_long;
+    if (func == PyFloat_Type.tp_as_number->nb_subtract)
+        return adapter->sub_float;
     if (func == adapter->virtual_nb_subtract)
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
@@ -680,6 +691,8 @@ static binary_handler
 get_nb_mult_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyLong_Type.tp_as_number->nb_multiply)
         return adapter->mul_long;
+    if (func == PyFloat_Type.tp_as_number->nb_multiply)
+        return adapter->mul_float;
     if (func == adapter->virtual_nb_multiply)
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
@@ -819,7 +832,13 @@ get_nb_floor_div_handler(SymbolicAdapter *adapter, binaryfunc func) {
 BINARY_FUN_AS(nb_floor_divide, tp_as_number, get_nb_floor_div_handler, default_binary_approximation)
 SLOT(nb_floor_divide)
 
-BINARY_FUN_AS(nb_true_divide, tp_as_number, default_binary_handler_getter, default_binary_approximation)
+static binary_handler
+get_nb_true_div_handler(SymbolicAdapter *adapter, binaryfunc func) {
+    if (func == PyFloat_Type.tp_as_number->nb_true_divide)
+        return adapter->div_float;
+    return adapter->default_binary_handler;
+}
+BINARY_FUN_AS(nb_true_divide, tp_as_number, get_nb_true_div_handler, default_binary_approximation)
 SLOT(nb_true_divide)
 BINARY_FUN_AS(nb_inplace_floor_divide, tp_as_number, default_binary_handler_getter, default_binary_approximation)
 SLOT(nb_inplace_floor_divide)

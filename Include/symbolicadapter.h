@@ -44,6 +44,16 @@ typedef struct {
     PyObject *(*div_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*rem_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*pow_long)(void *, PyObject *base, PyObject *pow, PyObject *mod);
+    PyObject *(*gt_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*lt_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*eq_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*ne_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*le_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*ge_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*add_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*sub_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*mul_float)(void *, PyObject *left, PyObject *right);
+    PyObject *(*div_float)(void *, PyObject *left, PyObject *right);
     PyObject *(*bool_and)(void *, PyObject *, PyObject *);
     PyObject *(*list_get_item)(void *, PyObject *storage, PyObject *index);
     int (*list_set_item)(void *, PyObject *storage, PyObject *index, PyObject *value);

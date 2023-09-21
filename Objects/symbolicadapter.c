@@ -189,6 +189,16 @@ create_new_adapter_(PyObject *ready_wrapper_types, void *handler_param) {
     result->div_long = default_binary;
     result->rem_long = default_binary;
     result->pow_long = default_ternary;
+    result->gt_float = default_binary;
+    result->lt_float = default_binary;
+    result->eq_float = default_binary;
+    result->ne_float = default_binary;
+    result->le_float = default_binary;
+    result->ge_float = default_binary;
+    result->add_float = default_binary;
+    result->sub_float = default_binary;
+    result->mul_float = default_binary;
+    result->div_float = default_binary;
     result->bool_and = default_binary;
     result->list_get_item = default_binary;
     result->list_set_item = default_set_item;
