@@ -219,6 +219,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
     result->symbolic_int_cast = default_unary;
+    result->symbolic_float_cast = default_unary;
     result->nb_add = default_binary_notify;
     result->nb_subtract = default_binary_notify;
     result->nb_multiply = default_binary_notify;

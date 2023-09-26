@@ -73,6 +73,7 @@ typedef struct {
     PyObject *(*range_iterator_next)(void *, PyObject *iterator);
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
     PyObject *(*symbolic_int_cast)(void *, PyObject *);
+    PyObject *(*symbolic_float_cast)(void *, PyObject *);
     int (*nb_add)(void *, PyObject *left, PyObject *right);
     int (*nb_subtract)(void *, PyObject *left, PyObject *right);
     int (*nb_multiply)(void *, PyObject *left, PyObject *right);
