@@ -836,6 +836,8 @@ static binary_handler
 get_nb_true_div_handler(SymbolicAdapter *adapter, binaryfunc func) {
     if (func == PyFloat_Type.tp_as_number->nb_true_divide)
         return adapter->div_float;
+    if (func == PyLong_Type.tp_as_number->nb_true_divide)
+        return adapter->true_div_long;
     return adapter->default_binary_handler;
 }
 BINARY_FUN_AS(nb_true_divide, tp_as_number, get_nb_true_div_handler, default_binary_approximation)

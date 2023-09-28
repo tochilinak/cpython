@@ -43,6 +43,7 @@ typedef struct {
     PyObject *(*sub_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*mul_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*div_long)(void *, PyObject *left, PyObject *right);
+    PyObject *(*true_div_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*rem_long)(void *, PyObject *left, PyObject *right);
     PyObject *(*pow_long)(void *, PyObject *base, PyObject *pow, PyObject *mod);
     PyObject *(*gt_float)(void *, PyObject *left, PyObject *right);

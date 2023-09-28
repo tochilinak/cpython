@@ -190,6 +190,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->sub_long = default_binary;
     result->mul_long = default_binary;
     result->div_long = default_binary;
+    result->true_div_long = default_binary;
     result->rem_long = default_binary;
     result->pow_long = default_ternary;
     result->gt_float = default_binary;
