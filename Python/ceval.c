@@ -1835,6 +1835,18 @@ resume_frame:
     /* _PyEval_EvalFrameDefault() must not be called with an exception set,
        because it can clear it (directly or indirectly) and so the
        caller loses its exception */
+    if (_PyErr_Occurred(tstate)) {
+        PyObject *type, *value, *traceback;
+        _PyErr_Fetch(tstate, &type, &value, &traceback);
+        printf("Exception type: ");
+        PyObject_Print(type, stdout, 0);
+        printf("\nException value: ");
+        PyObject_Print(value, stdout, 0);
+        printf("\nTraceback: ");
+        PyObject_Print(traceback, stdout, 0);
+        fflush(stdout);
+        assert(0);
+    }
     assert(!_PyErr_Occurred(tstate));
 #endif
 
