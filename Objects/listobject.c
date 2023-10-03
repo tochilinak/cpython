@@ -3477,3 +3477,4 @@ listiter_reduce_general(void *_it, int forward)
 
 void *EXPORT_FOR_APPROXIMATION_LIST_APPEND = list_append;
 void *EXPORT_FOR_APPROXIMATION_LIST_POP = list_pop;
+void *EXPORT_FOR_APPROXIMATION_LIST_INSERT = list_insert;
