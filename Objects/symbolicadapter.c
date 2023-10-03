@@ -213,6 +213,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->list_iterator_next = default_unary;
     result->list_concat = default_binary;
     result->list_inplace_concat = default_binary;
+    result->list_pop = default_unary;
     result->tuple_get_size = default_unary;
     result->tuple_get_item = default_binary;
     result->tuple_iter = default_unary;
