@@ -203,7 +203,6 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->sub_float = default_binary;
     result->mul_float = default_binary;
     result->div_float = default_binary;
-    result->bool_and = default_binary;
     result->list_get_item = default_binary;
     result->list_set_item = default_set_item;
     result->list_extend = default_binary;
@@ -213,17 +212,12 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->list_iterator_next = default_unary;
     result->list_concat = default_binary;
     result->list_inplace_concat = default_binary;
-    result->list_pop = default_unary;
-    result->list_pop_ind = default_binary;
-    result->list_insert = default_ternary_notify;
     result->tuple_get_size = default_unary;
     result->tuple_get_item = default_binary;
     result->tuple_iter = default_unary;
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
-    result->symbolic_int_cast = default_unary;
-    result->symbolic_float_cast = default_unary;
     result->nb_add = default_binary_notify;
     result->nb_subtract = default_binary_notify;
     result->nb_multiply = default_binary_notify;

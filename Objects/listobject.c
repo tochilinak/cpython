@@ -3474,7 +3474,3 @@ listiter_reduce_general(void *_it, int forward)
         return NULL;
     return Py_BuildValue("N(N)", _PyEval_GetBuiltin(&_Py_ID(iter)), list);
 }
-
-void *EXPORT_FOR_APPROXIMATION_LIST_APPEND = list_append;
-void *EXPORT_FOR_APPROXIMATION_LIST_POP = list_pop;
-void *EXPORT_FOR_APPROXIMATION_LIST_INSERT = list_insert;

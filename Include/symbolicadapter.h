@@ -56,7 +56,6 @@ typedef struct {
     PyObject *(*sub_float)(void *, PyObject *left, PyObject *right);
     PyObject *(*mul_float)(void *, PyObject *left, PyObject *right);
     PyObject *(*div_float)(void *, PyObject *left, PyObject *right);
-    PyObject *(*bool_and)(void *, PyObject *, PyObject *);
     PyObject *(*list_get_item)(void *, PyObject *storage, PyObject *index);
     int (*list_set_item)(void *, PyObject *storage, PyObject *index, PyObject *value);
     PyObject *(*list_extend)(void *, PyObject *list, PyObject *iterable);
@@ -66,9 +65,6 @@ typedef struct {
     PyObject *(*list_iterator_next)(void *, PyObject *iterator);
     PyObject *(*list_concat)(void *, PyObject *, PyObject *);
     PyObject *(*list_inplace_concat)(void *, PyObject *, PyObject *);
-    PyObject *(*list_pop)(void *, PyObject *);
-    PyObject *(*list_pop_ind)(void *, PyObject *, PyObject *);
-    int (*list_insert)(void *, PyObject *, PyObject *, PyObject *);
     PyObject *(*tuple_get_size)(void *, PyObject *tuple);
     PyObject *(*tuple_get_item)(void *, PyObject *tuple, PyObject *index);
     PyObject *(*tuple_iter)(void *, PyObject *tuple);
@@ -76,8 +72,6 @@ typedef struct {
     PyObject *(*range_iter)(void *, PyObject *range);
     PyObject *(*range_iterator_next)(void *, PyObject *iterator);
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
-    PyObject *(*symbolic_int_cast)(void *, PyObject *);
-    PyObject *(*symbolic_float_cast)(void *, PyObject *);
     int (*nb_add)(void *, PyObject *left, PyObject *right);
     int (*nb_subtract)(void *, PyObject *left, PyObject *right);
     int (*nb_multiply)(void *, PyObject *left, PyObject *right);
