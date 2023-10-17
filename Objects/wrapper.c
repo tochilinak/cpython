@@ -208,6 +208,8 @@ tp_richcompare(PyObject *self, PyObject *other, int op) {
     PyObject *concrete_result = concrete_self->ob_type->tp_richcompare(concrete_self, concrete_other, op);
     PyObject *symbolic = Py_None;
     if (concrete_result != Py_NotImplemented) {
+        if (adapter->fixate_type(adapter->handler_param, symbolic_self)) return 0;
+        if (adapter->fixate_type(adapter->handler_param, symbolic_other)) return 0;
         symbolic = tp_richcompare_handler_getter(adapter, concrete_self->ob_type->tp_richcompare, op)(adapter->handler_param, symbolic_self, symbolic_other);
         if (!symbolic) return 0;
     }
