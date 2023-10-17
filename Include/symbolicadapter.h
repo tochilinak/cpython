@@ -47,6 +47,15 @@ typedef struct {
     PyObject *(*symbolic_tp_call)(void *, PyObject *on, PyObject *args, PyObject *kwargs);
 
     /** TODO */
+    int (*is_pycfunction_with_approximation)(void *, PyObject *symbolic_pycfunction);
+
+    /** TODO */
+    PyObject *(*extract_symbolic_self_from_pycfunction)(void *, PyObject *symbolic_pycfunction);
+
+    /** TODO */
+    PyObject *(*approximate_pycfunction_call)(void *, int *approximated, PyObject *symbolic_pycfunction, PyObject *wrapped_self, PyObject *args, PyObject *kwargs);
+
+    /** TODO */
     PyObject *(*standard_tp_getattro)(void *, PyObject *obj, PyObject *name);
 
     /** Asks for symbolic representation of constant `obj`. */

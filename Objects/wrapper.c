@@ -288,6 +288,27 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     if (approximated)
         return r;
 
+    if (PyCFunction_Check(concrete_self)) {
+        int approximation_query = adapter->is_pycfunction_with_approximation(adapter->handler_param, symbolic_self);
+        if (approximation_query < 0)
+            return 0;
+        if (approximation_query) {
+            PyObject *symbolic_method_self = adapter->extract_symbolic_self_from_pycfunction(adapter->handler_param, symbolic_self);
+            if (!symbolic_method_self)
+                return 0;
+            PyObject *concrete_method_self = ((PyCFunctionObject *) concrete_self)->m_self;
+            PyObject *wrapped_method_self = wrap(concrete_method_self, symbolic_method_self, adapter);
+            approximated = 0;
+            PyObject *result = adapter->approximate_pycfunction_call(adapter->handler_param, &approximated, symbolic_self, wrapped_method_self, o1, o2);
+            Py_XDECREF(wrapped_method_self);
+            Py_DECREF(symbolic_method_self);
+            if (!result)
+                return 0;
+            if (approximated)
+                return result;
+        }
+    }
+
     PyObject *concrete_o1 = 0;
     PyObject *symbolic_o1 = 0;
     if (o1) {

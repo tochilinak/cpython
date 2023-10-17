@@ -6505,6 +6505,36 @@ get_exception_handler(PyCodeObject *code, int index, int *level, int *handler, i
     return 0;
 }
 
+static PyObject *
+process_symbolic_varargs(SymbolicAdapter *adapter, PyObject *raw_args) {
+    assert(raw_args && PyTuple_Check(raw_args));
+    PyTupleObject *orig_tuple = (PyTupleObject *) raw_args;
+    int n = PyTuple_GET_SIZE(raw_args);
+    int any_symbolic = 0;
+    for (int i = 0; i < n; i++) {
+        PyObject *elem = orig_tuple->ob_item[i];
+        any_symbolic = any_symbolic || is_wrapped(elem);
+    }
+    if (!any_symbolic)
+        return raw_args;
+    PyObject **symbolic = malloc((n + 1) * sizeof(PyObject *));
+    PyObject *concrete = PyTuple_New(n);
+    for (int i = 0; i < n; i++) {
+        PyObject *elem = orig_tuple->ob_item[i];
+        symbolic[i] = get_symbolic_or_none(elem);
+        PyObject *concrete_elem = unwrap(elem);
+        Py_INCREF(concrete_elem);
+        PyTuple_SetItem(concrete, i, concrete_elem);
+    }
+    symbolic[n] = 0;
+    PyObject *symbolic_result = adapter->create_tuple(adapter->handler_param, symbolic);
+    free(symbolic);
+    Py_DECREF(raw_args);
+    if (!symbolic_result)
+        return 0;
+    return wrap(concrete, symbolic_result, adapter);
+}
+
 static int
 initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
     PyObject **localsplus, PyObject *const *args,
@@ -6560,6 +6590,17 @@ initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
             goto fail_post_positional;
         }
         assert(localsplus[total_args] == NULL);
+        SymbolicAdapter *adapter = 0;
+        assert(PyTuple_Check(co->co_consts));
+        int sz = PyTuple_GET_SIZE(co->co_consts);
+        if (sz && SymbolicAdapter_CheckExact(((PyTupleObject *)co->co_consts)->ob_item[sz - 1])) {
+            adapter = (SymbolicAdapter *) ((PyTupleObject *)co->co_consts)->ob_item[sz - 1];
+        }
+        if (adapter) {
+            u = process_symbolic_varargs(adapter, u);
+            if (!u)
+                goto fail_post_positional;
+        }
         localsplus[total_args] = u;
     }
     else if (argcount > n) {
