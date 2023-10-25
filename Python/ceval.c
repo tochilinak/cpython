@@ -1920,8 +1920,8 @@ handle_eval_breaker:
         }
 
         TARGET(LOAD_CONST) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(LOAD_CONST);
+            TOUCH_STACK(0, -1);
             PyObject *value = GETITEM(consts, oparg);
             Py_INCREF(value);
             PUSH(value);
@@ -1939,8 +1939,8 @@ handle_eval_breaker:
         }
 
         TARGET(STORE_FAST) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(STORE_FAST);
+            TOUCH_STACK(0, -1);
             PyObject *value = POP();
             SETLOCAL(oparg, value);
             DISPATCH();
@@ -2264,9 +2264,9 @@ handle_eval_breaker:
         }
 
         TARGET(BINARY_SUBSCR) {  // API, but special case for types
+            PREDICTED(BINARY_SUBSCR);
             if (PyType_Check(unwrap(SECOND())))
                 TOUCH_STACK(2, -1);
-            PREDICTED(BINARY_SUBSCR);
             PyObject *sub = POP();
             PyObject *container = TOP();
             PyObject *res = PyObject_GetItem(container, sub);
@@ -2448,8 +2448,8 @@ handle_eval_breaker:
         }
 
         TARGET(STORE_SUBSCR) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(STORE_SUBSCR);
+            TOUCH_STACK(0, -1);
             PyObject *sub = TOP();
             PyObject *container = SECOND();
             PyObject *v = THIRD();
@@ -2712,8 +2712,8 @@ handle_eval_breaker:
         }
 
         TARGET(GET_AWAITABLE) {  // MUST BE UNWRAPPED
-            TOUCH_STACK(1, -1);
             PREDICTED(GET_AWAITABLE);
+            TOUCH_STACK(1, -1);
             PyObject *iterable = TOP();
             PyObject *iter = _PyCoro_GetAwaitableIter(iterable);
 
@@ -2975,8 +2975,8 @@ handle_eval_breaker:
         }
 
         TARGET(UNPACK_SEQUENCE) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(UNPACK_SEQUENCE);
+            TOUCH_STACK(0, -1);
             PyObject *seq = POP();
             set_adapter_if_symbolic_tracing_enabled(local_adapter)
             if (local_adapter) {
@@ -3069,8 +3069,8 @@ handle_eval_breaker:
         }
 
         TARGET(STORE_ATTR) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(STORE_ATTR);
+            TOUCH_STACK(0, -1);
             PyObject *name = GETITEM(names, oparg);
             PyObject *owner = TOP();
             PyObject *v = SECOND();
@@ -3191,8 +3191,8 @@ handle_eval_breaker:
         }
 
         TARGET(LOAD_GLOBAL) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(LOAD_GLOBAL);
+            TOUCH_STACK(0, -1);
             int push_null = oparg & 1;
             PEEK(0) = NULL;
             PyObject *name = GETITEM(names, oparg>>1);
@@ -3719,8 +3719,8 @@ handle_eval_breaker:
         }
 
         TARGET(LOAD_ATTR) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(LOAD_ATTR);
+            TOUCH_STACK(0, -1);
             PyObject *name = GETITEM(names, oparg);
             set_adapter_if_symbolic_tracing_enabled(local_adapter)
             if (local_adapter) {
@@ -3965,8 +3965,8 @@ handle_eval_breaker:
         }
 
         TARGET(COMPARE_OP) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(COMPARE_OP);
+            TOUCH_STACK(0, -1);
             assert(oparg <= Py_GE);
             PyObject *right = POP();
             PyObject *left = TOP();
@@ -4283,8 +4283,8 @@ handle_eval_breaker:
         }
 
         TARGET(POP_JUMP_BACKWARD_IF_FALSE) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(POP_JUMP_BACKWARD_IF_FALSE);
+            TOUCH_STACK(0, -1);
             PyObject *cond = POP();
             if (Py_IsTrue(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
@@ -4310,8 +4310,8 @@ handle_eval_breaker:
         }
 
         TARGET(POP_JUMP_FORWARD_IF_FALSE) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(POP_JUMP_FORWARD_IF_FALSE);
+            TOUCH_STACK(0, -1);
             PyObject *cond = POP();
             if (Py_IsTrue(cond)) {
                 _Py_DECREF_NO_DEALLOC(cond);
@@ -4648,8 +4648,8 @@ handle_eval_breaker:
         }
 
         TARGET(FOR_ITER) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(FOR_ITER);
+            TOUCH_STACK(0, -1);
             /* before: [iter]; after: [iter, iter()] *or* [] */
             PyObject *iter = TOP();
 #ifdef Py_STATS
@@ -4806,8 +4806,8 @@ handle_eval_breaker:
         }
 
         TARGET(LOAD_METHOD) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(LOAD_METHOD);
+            TOUCH_STACK(0, -1);
             /* Designed to work in tandem with PRECALL. */
             PyObject *name = GETITEM(names, oparg);
             set_adapter_if_symbolic_tracing_enabled(local_adapter)
@@ -4985,8 +4985,8 @@ handle_eval_breaker:
         }
 
         TARGET(PRECALL) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(PRECALL);
+            TOUCH_STACK(0, -1);
             /* Designed to work in tamdem with LOAD_METHOD. */
             /* `meth` is NULL when LOAD_METHOD thinks that it's not
                 a method call.
@@ -5685,8 +5685,8 @@ handle_eval_breaker:
         }
 
         TARGET(CALL_FUNCTION_EX) {  // REQUIRES UNWRAPPED
-            TOUCH_STACK(2 + ((oparg & 0x01) != 0), -1);
             PREDICTED(CALL_FUNCTION_EX);
+            TOUCH_STACK(2 + ((oparg & 0x01) != 0), -1);
             PyObject *func, *callargs, *kwargs = NULL, *result;
             if (oparg & 0x01) {
                 kwargs = POP();
@@ -5916,8 +5916,8 @@ handle_eval_breaker:
         }
 
         TARGET(BINARY_OP) {  // API
-            TOUCH_STACK(0, -1);
             PREDICTED(BINARY_OP);
+            TOUCH_STACK(0, -1);
             PyObject *rhs = POP();
             PyObject *lhs = TOP();
             assert(0 <= oparg);
