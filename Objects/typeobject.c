@@ -15,6 +15,8 @@
 #include "opcode.h"               // MAKE_CELL
 #include "structmember.h"         // PyMemberDef
 
+#include "approximation_defs.h"
+
 #include <ctype.h>
 
 /*[clinic input]
@@ -9222,3 +9224,6 @@ PyTypeObject PySuper_Type = {
     PyObject_GC_Del,                            /* tp_free */
     .tp_vectorcall = (vectorcallfunc)super_vectorcall,
 };
+
+void *EXPORT_OBJECT_INIT = object_init;
+void *EXPORT_SLOT_INIT = slot_tp_init;
