@@ -104,8 +104,10 @@ tp_getattro(PyObject *self, PyObject *other) {
         return 0;
 
     PyObject *concrete_result = concrete_self->ob_type->tp_getattro(concrete_self, concrete_other);
-    if (!concrete_result)
-        return 0;
+    PyObject *type = 0, *value = 0, *traceback = 0;
+    if (!concrete_result) {
+        PyErr_Fetch(&type, &value, &traceback);
+    }
 
     PyObject *symbolic_result = Py_None;
     if (concrete_self->ob_type->tp_getattro == PyObject_GenericGetAttr) {
@@ -115,6 +117,12 @@ tp_getattro(PyObject *self, PyObject *other) {
     } else if (concrete_self->ob_type->tp_getattro == adapter->virtual_tp_getattro) {
         symbolic_result = adapter->symbolic_virtual_binary_fun(adapter->handler_param, symbolic_self, symbolic_other);
         if (!symbolic_result) return 0;
+    }
+
+    if (!concrete_result && !PyErr_Occurred()) {
+        assert(type);
+        PyErr_Restore(type, value, traceback);
+        return 0;
     }
 
     if (symbolic_result == Py_None) {
