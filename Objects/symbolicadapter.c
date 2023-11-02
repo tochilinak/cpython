@@ -175,6 +175,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->is_op = default_binary_notify;
     result->none_check = default_unary_notify;
     result->symbolic_tp_call = default_ternary;
+    result->extract_self_from_method = default_unary;
     result->is_pycfunction_with_approximation = default_unary_notify;
     result->extract_symbolic_self_from_pycfunction = default_unary;
     result->approximate_pycfunction_call = default_approximate_pycfunction_call;

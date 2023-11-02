@@ -271,6 +271,21 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
     return 0;
 }
 
+static PyObject *
+call_function_with_symbolic_tracing(SymbolicAdapter *adapter, PyObject *func, PyObject *args, PyObject *kwargs) {
+    assert(func && PyFunction_Check(func));
+    assert(args && PyTuple_Check(args));
+    assert(!kwargs || PyDict_Check(kwargs));
+    if (register_symbolic_tracing(func, adapter))
+        return 0;
+    if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(func)))
+        return 0;
+    PyObject *old = adapter->inside_wrapper_tp_call;
+    adapter->inside_wrapper_tp_call = PyFunction_GetCode(func);
+    PyObject *result = Py_TYPE(func)->tp_call(func, args, kwargs);
+    adapter->inside_wrapper_tp_call = old;
+    return result;
+}
 
 static PyObject *
 tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
@@ -282,15 +297,18 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     assert(!o2 || PyDict_Check(o2));
 
     if (PyFunction_Check(concrete_self)) {
-        if (register_symbolic_tracing(concrete_self, adapter))
+        return call_function_with_symbolic_tracing(adapter, concrete_self, o1, o2);
+    }
+
+    if (PyMethod_Check(concrete_self)) {
+        PyObject *symbolic_method_self = adapter->extract_self_from_method(adapter->handler_param, symbolic_self);
+        if (!symbolic_method_self)
             return 0;
-        if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(concrete_self)))
-            return 0;
-        PyObject *old = adapter->inside_wrapper_tp_call;
-        adapter->inside_wrapper_tp_call = PyFunction_GetCode(concrete_self);
-        PyObject *result = Py_TYPE(concrete_self)->tp_call(concrete_self, o1, o2);
-        adapter->inside_wrapper_tp_call = old;
-        return result;
+        PyObject *concrete_method_self = PyMethod_GET_SELF(concrete_self);
+        assert(concrete_method_self);
+        PyObject *function = PyMethod_GET_FUNCTION(concrete_self);
+        PyObject *args = PySequence_Concat(PyTuple_Pack(1, wrap(concrete_method_self, symbolic_method_self, adapter)), o1);
+        return call_function_with_symbolic_tracing(adapter, function, args, o2);
     }
 
     int approximated = 0;

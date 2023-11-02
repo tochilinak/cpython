@@ -47,6 +47,9 @@ typedef struct {
     PyObject *(*symbolic_tp_call)(void *, PyObject *on, PyObject *args, PyObject *kwargs);
 
     /** TODO */
+    PyObject *(*extract_self_from_method)(void *, PyObject *on);
+
+    /** TODO */
     int (*is_pycfunction_with_approximation)(void *, PyObject *symbolic_pycfunction);
 
     /** TODO */
