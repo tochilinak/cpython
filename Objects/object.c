@@ -1017,7 +1017,7 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
     PyTypeObject *tp = Py_TYPE(v);
     int err;
 
-    if (!PyUnicode_Check(name)) {
+    if (!PyUnicode_Check(name) && !(is_wrapped(name) && is_wrapped(v) && PyUnicode_Check(unwrap(name)))) {
         PyErr_Format(PyExc_TypeError,
                      "attribute name must be string, not '%.200s'",
                      Py_TYPE(name)->tp_name);

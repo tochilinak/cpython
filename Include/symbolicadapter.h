@@ -50,6 +50,9 @@ typedef struct {
     PyObject *(*extract_self_from_method)(void *, PyObject *on);
 
     /** TODO */
+    PyObject *(*approximate_type_call)(void *, int *approximated, PyObject *type, PyObject *args, PyObject *kwargs);
+
+    /** TODO */
     int (*is_pycfunction_with_approximation)(void *, PyObject *symbolic_pycfunction);
 
     /** TODO */
@@ -60,6 +63,9 @@ typedef struct {
 
     /** TODO */
     PyObject *(*standard_tp_getattro)(void *, PyObject *obj, PyObject *name);
+
+    /** TODO */
+    int (*standard_tp_setattro)(void *, PyObject *obj, PyObject *name, PyObject *value);
 
     /** Asks for symbolic representation of constant `obj`. */
     PyObject *(*load_const)(void *, PyObject *obj);
@@ -300,6 +306,9 @@ typedef struct {
 
     /** Notifies that `tp_getattro` is about to be performed on symbolic objects `on` and `name` (`name` is a symbolic representation of string). */
     int (*tp_getattro)(void *, PyObject *on, PyObject *name);
+
+    /** TODO */
+    int (*tp_setattro)(void *, PyObject *on, PyObject *name, PyObject *value);
 
     /** Notifies that `tp_iter` is about to be performed on symbolic object `on`. */
     int (*tp_iter)(void *, PyObject *);

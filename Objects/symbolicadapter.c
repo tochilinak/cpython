@@ -153,6 +153,7 @@ static PyObject *default_unary(void *arg, PyObject *o) { Py_RETURN_NONE; }
 static PyObject *default_binary(void *arg, PyObject *left, PyObject *right) { Py_RETURN_NONE; }
 static PyObject *default_ternary(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { Py_RETURN_NONE; }
 static PyObject *default_approximate_pycfunction_call(void *arg, int *approximated, PyObject *o1, PyObject *o2, PyObject *o3, PyObject *o4) { Py_RETURN_NONE; }
+static PyObject *default_approximate_type_call(void *arg, int *approximated, PyObject *o1, PyObject *o2, PyObject *o3) { Py_RETURN_NONE; }
 static int default_set_item(void *arg, PyObject *storage, PyObject *index, PyObject *value) { return 0; }
 static int default_lost_symbolic_value(void *arg, const char *description) { return 0; }
 
@@ -176,10 +177,12 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->none_check = default_unary_notify;
     result->symbolic_tp_call = default_ternary;
     result->extract_self_from_method = default_unary;
+    result->approximate_type_call = default_approximate_type_call;
     result->is_pycfunction_with_approximation = default_unary_notify;
     result->extract_symbolic_self_from_pycfunction = default_unary;
     result->approximate_pycfunction_call = default_approximate_pycfunction_call;
     result->standard_tp_getattro = default_binary;
+    result->standard_tp_setattro = default_ternary_notify;
     result->load_const = default_unary;
     result->create_list = default_create_collection;
     result->create_tuple = default_create_collection;
@@ -257,6 +260,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->mp_ass_subscript = default_ternary_notify;
     result->tp_richcompare = default_tp_richcompare;
     result->tp_getattro = default_binary_notify;
+    result->tp_setattro = default_ternary_notify;
     result->tp_iter = default_unary_notify;
     result->tp_iternext = default_unary_notify;
     result->symbolic_virtual_unary_fun = default_unary;

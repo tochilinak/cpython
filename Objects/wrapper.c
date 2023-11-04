@@ -316,6 +316,14 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     if (approximated)
         return r;
 
+    if (PyType_Check(concrete_self)) {
+        PyObject *result = adapter->approximate_type_call(adapter->handler_param, &approximated, concrete_self, o1, o2);
+        if (!result)
+            return 0;
+        if (approximated)
+            return result;
+    }
+
     if (PyCFunction_Check(concrete_self)) {
         int approximation_query = adapter->is_pycfunction_with_approximation(adapter->handler_param, symbolic_self);
         if (approximation_query < 0)
@@ -404,7 +412,25 @@ tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
         return 0;
     }
 
-    return concrete_self->ob_type->tp_setattro(concrete_self, concrete_attr, concrete_value);
+    PyObject *symbolic_self = get_symbolic_or_none(self);
+    PyObject *symbolic_attr = get_symbolic_or_none(attr);
+    PyObject *symbolic_value = get_symbolic_or_none(value);
+    SymbolicAdapter *adapter = get_adapter(self);
+    assert(adapter);
+
+    if (adapter->tp_setattro(adapter->handler_param, symbolic_self, symbolic_attr, symbolic_value))
+        return 0;
+
+    int concrete_result = concrete_self->ob_type->tp_setattro(concrete_self, concrete_attr, concrete_value);
+    if (!concrete_result)
+        return 0;
+
+    if (Py_TYPE(concrete_attr)->tp_setattro == PyObject_GenericSetAttr) {
+        if (adapter->standard_tp_setattro(adapter->handler_param, symbolic_self, symbolic_attr, symbolic_value))
+            return 0;
+    }
+
+    return concrete_result;
 }
 SLOT(tp_setattro)
 

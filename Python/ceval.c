@@ -3072,6 +3072,12 @@ handle_eval_breaker:
             PREDICTED(STORE_ATTR);
             TOUCH_STACK(0, -1);
             PyObject *name = GETITEM(names, oparg);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            if (local_adapter) {
+                PyObject *symbolic_name = local_adapter->load_const(local_adapter->handler_param, name);
+                if (!symbolic_name) goto error;
+                name = wrap(name, symbolic_name, local_adapter);
+            }
             PyObject *owner = TOP();
             PyObject *v = SECOND();
             int err;
