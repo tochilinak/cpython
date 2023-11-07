@@ -916,18 +916,20 @@ PyObject_GetAttr(PyObject *v, PyObject *name)
     PyObject* result = NULL;
     if (tp->tp_getattro != NULL) {
         result = (*tp->tp_getattro)(v, name);
-    }
-    else if (tp->tp_getattr != NULL) {
-        const char *name_str = PyUnicode_AsUTF8(name);
-        if (name_str == NULL) {
-            return NULL;
+    } else {
+        name = unwrap(name);
+        if (tp->tp_getattr != NULL) {
+            const char *name_str = PyUnicode_AsUTF8(name);
+            if (name_str == NULL) {
+                return NULL;
+            }
+            result = (*tp->tp_getattr)(v, (char *)name_str);
         }
-        result = (*tp->tp_getattr)(v, (char *)name_str);
-    }
-    else {
-        PyErr_Format(PyExc_AttributeError,
-                    "'%.50s' object has no attribute '%U'",
-                    tp->tp_name, name);
+        else {
+            PyErr_Format(PyExc_AttributeError,
+                        "'%.50s' object has no attribute '%U'",
+                        tp->tp_name, name);
+        }
     }
 
     if (result == NULL) {
@@ -1025,12 +1027,14 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
     }
     Py_INCREF(name);
 
-    PyUnicode_InternInPlace(&name);
+    if (!is_wrapped)
+        PyUnicode_InternInPlace(&name);
     if (tp->tp_setattro != NULL) {
         err = (*tp->tp_setattro)(v, name, value);
         Py_DECREF(name);
         return err;
     }
+    name = unwrap(name);
     if (tp->tp_setattr != NULL) {
         const char *name_str = PyUnicode_AsUTF8(name);
         if (name_str == NULL) {
