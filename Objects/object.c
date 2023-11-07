@@ -1027,7 +1027,7 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
     }
     Py_INCREF(name);
 
-    if (!is_wrapped)
+    if (!is_wrapped(name))
         PyUnicode_InternInPlace(&name);
     if (tp->tp_setattro != NULL) {
         err = (*tp->tp_setattro)(v, name, value);
