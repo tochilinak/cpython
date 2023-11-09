@@ -6601,6 +6601,12 @@ initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
         localsplus[j] = x;
     }
 
+    SymbolicAdapter *adapter = 0;
+    assert(PyTuple_Check(co->co_consts));
+    int sz = PyTuple_GET_SIZE(co->co_consts);
+    if (sz && SymbolicAdapter_CheckExact(((PyTupleObject *)co->co_consts)->ob_item[sz - 1])) {
+        adapter = (SymbolicAdapter *) ((PyTupleObject *)co->co_consts)->ob_item[sz - 1];
+    }
     /* Pack other positional arguments into the *args argument */
     if (co->co_flags & CO_VARARGS) {
         PyObject *u = NULL;
@@ -6615,12 +6621,6 @@ initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
             goto fail_post_positional;
         }
         assert(localsplus[total_args] == NULL);
-        SymbolicAdapter *adapter = 0;
-        assert(PyTuple_Check(co->co_consts));
-        int sz = PyTuple_GET_SIZE(co->co_consts);
-        if (sz && SymbolicAdapter_CheckExact(((PyTupleObject *)co->co_consts)->ob_item[sz - 1])) {
-            adapter = (SymbolicAdapter *) ((PyTupleObject *)co->co_consts)->ob_item[sz - 1];
-        }
         if (adapter) {
             u = process_symbolic_varargs(adapter, u);
             if (!u)
@@ -6745,7 +6745,12 @@ initialize_locals(PyThreadState *tstate, PyFunctionObject *func,
             for (; i < defcount; i++) {
                 if (localsplus[m+i] == NULL) {
                     PyObject *def = defs[i];
-                    Py_INCREF(def);
+                    if (adapter) {
+                        PyObject *symbolic = adapter->load_const(adapter->handler_param, def);
+                        def = wrap(def, symbolic, adapter);
+                    } else {
+                        Py_INCREF(def);
+                    }
                     localsplus[m+i] = def;
                 }
             }
