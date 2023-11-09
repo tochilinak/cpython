@@ -1870,6 +1870,9 @@ handle_eval_breaker:
     {
 #else
     dispatch_opcode:
+        //if (cframe.use_tracing) {
+        //    printf("opcode: %d\n", opcode); fflush(stdout);
+        //}
         switch (opcode) {
 #endif
 
@@ -2610,6 +2613,22 @@ handle_eval_breaker:
             tstate->cframe = cframe.previous;
             tstate->cframe->use_tracing = cframe.use_tracing;
             assert(tstate->cframe->current_frame == frame->previous);
+            if (_PyErr_Occurred(tstate)) {
+                PyObject *type = 0, *value = 0, *traceback = 0;
+                _PyErr_Fetch(tstate, &type, &value, &traceback);
+                printf("Exception type: ");
+                PyObject_Print(type, stdout, 0);
+                if (value) {
+                    printf("\nException value: ");
+                    PyObject_Print(value, stdout, 0);
+                }
+                if (traceback) {
+                    printf("\nTraceback: ");
+                    PyObject_Print(traceback, stdout, 0);
+                }
+                fflush(stdout);
+                assert(0);
+            }
             assert(!_PyErr_Occurred(tstate));
             return retval;
         }

@@ -106,6 +106,7 @@ tp_getattro(PyObject *self, PyObject *other) {
     PyObject *concrete_result = concrete_self->ob_type->tp_getattro(concrete_self, concrete_other);
     PyObject *type = 0, *value = 0, *traceback = 0;
     if (!concrete_result) {
+        assert(PyErr_Occurred());
         PyErr_Fetch(&type, &value, &traceback);
     }
 
@@ -119,15 +120,15 @@ tp_getattro(PyObject *self, PyObject *other) {
         if (!symbolic_result) return 0;
     }
 
-    if (!concrete_result && !PyErr_Occurred()) {
-        assert(type);
-        PyErr_Restore(type, value, traceback);
-        return 0;
-    }
-
     if (symbolic_result == Py_None) {
         sprintf(adapter->msg_buffer, "tp_getattro on %s", Py_TYPE(concrete_self)->tp_name);
         if (adapter->lost_symbolic_value(adapter->handler_param, adapter->msg_buffer)) return 0;
+    }
+
+    if (!concrete_result && !PyErr_Occurred()) {
+        assert(type);
+        PyErr_Restore(type, value, traceback);
+        return NULL;
     }
 
     return wrap(concrete_result, symbolic_result, adapter);
@@ -409,7 +410,7 @@ tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
     PyObject *concrete_value = unwrap(value);
     if (concrete_self->ob_type->tp_setattro == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_setattro");
-        return 0;
+        return -1;
     }
 
     PyObject *symbolic_self = get_symbolic_or_none(self);
@@ -419,18 +420,18 @@ tp_setattro(PyObject *self, PyObject *attr, PyObject *value)
     assert(adapter);
 
     if (adapter->tp_setattro(adapter->handler_param, symbolic_self, symbolic_attr, symbolic_value))
-        return 0;
+        return -1;
 
     int concrete_result = concrete_self->ob_type->tp_setattro(concrete_self, concrete_attr, concrete_value);
-    if (!concrete_result)
-        return 0;
+    if (concrete_result)
+        return concrete_result;
 
-    if (Py_TYPE(concrete_attr)->tp_setattro == PyObject_GenericSetAttr) {
+    if (Py_TYPE(concrete_self)->tp_setattro == PyObject_GenericSetAttr) {
         if (adapter->standard_tp_setattro(adapter->handler_param, symbolic_self, symbolic_attr, symbolic_value))
-            return 0;
+            return -1;
     }
 
-    return concrete_result;
+    return 0;
 }
 SLOT(tp_setattro)
 
