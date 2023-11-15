@@ -297,6 +297,9 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     assert(PyTuple_Check(o1));
     assert(!o2 || PyDict_Check(o2));
 
+    if (adapter->tp_call(adapter->handler_param, symbolic_self))
+        return 0;
+
     if (PyFunction_Check(concrete_self)) {
         return call_function_with_symbolic_tracing(adapter, concrete_self, o1, o2);
     }

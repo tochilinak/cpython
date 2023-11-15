@@ -317,6 +317,9 @@ typedef struct {
     int (*tp_iternext)(void *, PyObject *);
 
     /** TODO */
+    int (*tp_call)(void *, PyObject *on);
+
+    /** TODO */
     int (*fixate_type)(void *, PyObject *);
 
     /** TODO */

@@ -263,6 +263,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->tp_setattro = default_ternary_notify;
     result->tp_iter = default_unary_notify;
     result->tp_iternext = default_unary_notify;
+    result->tp_call = default_ternary_notify;
     result->symbolic_virtual_unary_fun = default_unary;
     result->symbolic_virtual_binary_fun = default_binary;
     result->lost_symbolic_value = default_lost_symbolic_value;
