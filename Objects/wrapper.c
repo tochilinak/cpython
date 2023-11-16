@@ -519,12 +519,13 @@ tp_hash(PyObject *self) {
     PyObject *concrete_self = unwrap(self);
     if (concrete_self->ob_type->tp_hash == 0) {
         PyErr_SetString(PyExc_TypeError, "no tp_hash");
-        return 0;
+        return -1;
     }
 
     SymbolicAdapter *adapter = get_adapter(self);
     assert(adapter != 0);
-    if (adapter->lost_symbolic_value(adapter->handler_param, "tp_hash")) return 0;
+    if (adapter->tp_hash(adapter->handler_param, get_symbolic_or_none(self)))
+        return -1;
 
     return concrete_self->ob_type->tp_hash(concrete_self);
 }

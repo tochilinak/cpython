@@ -320,6 +320,9 @@ typedef struct {
     int (*tp_call)(void *, PyObject *on);
 
     /** TODO */
+    int (*tp_hash)(void *, PyObject *on);
+
+    /** TODO */
     int (*fixate_type)(void *, PyObject *);
 
     /** TODO */
