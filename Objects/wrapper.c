@@ -35,6 +35,23 @@ get_symbolic_or_none(PyObject *obj) {
     return res;
 }
 
+
+static PyObject *
+call_function_with_symbolic_tracing(SymbolicAdapter *adapter, PyObject *func, PyObject *args, PyObject *kwargs) {
+    assert(func && PyFunction_Check(func));
+    assert(args && PyTuple_Check(args));
+    assert(!kwargs || PyDict_Check(kwargs));
+    if (register_symbolic_tracing(func, adapter))
+        return 0;
+    if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(func)))
+        return 0;
+    PyObject *old = adapter->inside_wrapper_tp_call;
+    adapter->inside_wrapper_tp_call = PyFunction_GetCode(func);
+    PyObject *result = Py_TYPE(func)->tp_call(func, args, kwargs);
+    adapter->inside_wrapper_tp_call = old;
+    return result;
+}
+
 static void
 tp_dealloc(PyObject *op) {
     //printf("DELETING: %p\n", op);
@@ -102,6 +119,13 @@ tp_getattro(PyObject *self, PyObject *other) {
 
     if (adapter->tp_getattro(adapter->handler_param, symbolic_self, symbolic_other))
         return 0;
+
+    PyObject *tmp_result = _PyType_Lookup(Py_TYPE(concrete_self), concrete_other);
+    if (tmp_result && Py_TYPE(tmp_result) == &PyProperty_Type) {
+        PyObject *getter = PyObject_GetAttrString(tmp_result, "fget");
+        assert(getter && PyFunction_Check(getter));
+        return call_function_with_symbolic_tracing(adapter, getter, PyTuple_Pack(1, self), 0);
+    }
 
     PyObject *concrete_result = concrete_self->ob_type->tp_getattro(concrete_self, concrete_other);
     PyObject *type = 0, *value = 0, *traceback = 0;
@@ -263,29 +287,13 @@ approximate_tp_call(PyObject *original, PyObject *o1, PyObject *o2, SymbolicAdap
         return adapter->approximation_builtin_sum(PyTuple_GetItem(o1, 0));
 
     } else if ((c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_MIN
-            || c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_MAX
-            || c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_ALL) && !o2) {
+                || c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_MAX
+                || c_method == EXPORT_FOR_APPROXIMATION_BUILTIN_ALL) && !o2) {
         *called_approximation = 1;
         return Py_TYPE(original)->tp_call(original, o1, 0);
 
     }
     return 0;
-}
-
-static PyObject *
-call_function_with_symbolic_tracing(SymbolicAdapter *adapter, PyObject *func, PyObject *args, PyObject *kwargs) {
-    assert(func && PyFunction_Check(func));
-    assert(args && PyTuple_Check(args));
-    assert(!kwargs || PyDict_Check(kwargs));
-    if (register_symbolic_tracing(func, adapter))
-        return 0;
-    if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(func)))
-        return 0;
-    PyObject *old = adapter->inside_wrapper_tp_call;
-    adapter->inside_wrapper_tp_call = PyFunction_GetCode(func);
-    PyObject *result = Py_TYPE(func)->tp_call(func, args, kwargs);
-    adapter->inside_wrapper_tp_call = old;
-    return result;
 }
 
 static PyObject *
