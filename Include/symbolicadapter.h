@@ -196,6 +196,12 @@ typedef struct {
     /** Operation `next()` on a symbolic tuple iterator (tuple iterator is a result of operation `iter()` on tuple). */
     PyObject *(*tuple_iterator_next)(void *, PyObject *iterator);
 
+    /** TODO */
+    PyObject *(*dict_get_item)(void *, PyObject *self, PyObject *key);
+
+    /** TODO */
+    int (*dict_set_item)(void *, PyObject *self, PyObject *key, PyObject *value);
+
     /** Operation `iter()` on a symbolic representation of range object. */
     PyObject *(*range_iter)(void *, PyObject *range);
 

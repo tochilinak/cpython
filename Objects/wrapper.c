@@ -1015,6 +1015,8 @@ get_mp_subscript_handler(SymbolicAdapter *adapter, binaryfunc func) {
         return adapter->list_get_item;
     if (func == PyTuple_Type.tp_as_mapping->mp_subscript)
         return adapter->tuple_get_item;
+    if (func == PyDict_Type.tp_as_mapping->mp_subscript)
+        return adapter->dict_get_item;
     if (func == adapter->virtual_mp_subscript)
         return adapter->symbolic_virtual_binary_fun;
     return adapter->default_binary_handler;
@@ -1035,6 +1037,8 @@ static ternary_notify
 get_mp_ass_subscript_handler(SymbolicAdapter *adapter, objobjargproc func) {
     if (func == PyList_Type.tp_as_mapping->mp_ass_subscript)
         return adapter->list_set_item;
+    if (func == PyDict_Type.tp_as_mapping->mp_ass_subscript)
+        return adapter->dict_set_item;
     return adapter->default_ternary_notify;
 }
 
