@@ -121,6 +121,12 @@ typedef struct {
     /** TODO */
     PyObject *(*pow_long)(void *, PyObject *base, PyObject *pow, PyObject *mod);
 
+    /** unary `-` operation on symbolic integer `on`. */
+    PyObject *(*neg_long)(void *, PyObject *on);
+
+    /** unary `+` operation on symbolic integer `on`. */
+    PyObject *(*pos_long)(void *, PyObject *on);
+
     /** TODO */
     PyObject *(*gt_float)(void *, PyObject *left, PyObject *right);
 
@@ -150,6 +156,12 @@ typedef struct {
 
     /** TODO */
     PyObject *(*div_float)(void *, PyObject *left, PyObject *right);
+
+    /** unary `-` operation on symbolic float `on`. */
+    PyObject *(*neg_float)(void *, PyObject *on);
+
+    /** unary `+` operation on symbolic float `on`. */
+    PyObject *(*pos_float)(void *, PyObject *on);
 
     /** Operation `storage[index]` (when concrete implementation is `PyList_Type.tp_as_mapping->mp_subscript`). */
     PyObject *(*list_get_item)(void *, PyObject *storage, PyObject *index);
@@ -210,6 +222,18 @@ typedef struct {
 
     /** Asks for a symbolic result of operation `isinstance`. */
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
+
+    /** TODO */
+    int (*nb_negative)(void *, PyObject *on);
+
+    /** TODO */
+    int (*nb_positive)(void *, PyObject *on);
+
+    /** TODO */
+    int (*nb_absolute)(void *, PyObject *on);
+
+    /** TODO */
+    int (*nb_invert)(void *, PyObject *on);
 
     /** Notifies that `nb_add` is about to be performed on symbolic objects `left` and `right`. */
     int (*nb_add)(void *, PyObject *left, PyObject *right);
@@ -357,6 +381,12 @@ typedef struct {
 
     /** TODO */
     void *virtual_nb_multiply;
+
+    /** TODO */
+    void *virtual_nb_negative;
+
+    /** TODO */
+    void *virtual_nb_positive;
 
     /** TODO */
     void *virtual_nb_matrix_multiply;

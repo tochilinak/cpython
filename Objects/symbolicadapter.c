@@ -201,6 +201,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->true_div_long = default_binary;
     result->rem_long = default_binary;
     result->pow_long = default_ternary;
+    result->neg_long = default_unary;
+    result->pos_long = default_unary;
     result->gt_float = default_binary;
     result->lt_float = default_binary;
     result->eq_float = default_binary;
@@ -211,6 +213,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->sub_float = default_binary;
     result->mul_float = default_binary;
     result->div_float = default_binary;
+    result->neg_float = default_unary;
+    result->pos_float = default_unary;
     result->list_get_item = default_binary;
     result->list_set_item = default_set_item;
     result->list_extend = default_binary;
@@ -228,6 +232,10 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
+    result->nb_negative = default_unary_notify;
+    result->nb_positive = default_unary_notify;
+    result->nb_absolute = default_unary_notify;
+    result->nb_invert = default_unary_notify;
     result->nb_add = default_binary_notify;
     result->nb_subtract = default_binary_notify;
     result->nb_multiply = default_binary_notify;
@@ -276,6 +284,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->virtual_nb_add = 0;
     result->virtual_nb_subtract = 0;
     result->virtual_nb_multiply = 0;
+    result->virtual_nb_negative = 0;
+    result->virtual_nb_positive = 0;
     result->virtual_mp_subscript = 0;
     result->approximation_builtin_len = 0;
     result->approximation_builtin_isinstance = 0;

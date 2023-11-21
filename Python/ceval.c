@@ -4190,7 +4190,11 @@ handle_eval_breaker:
                 goto error;
             }
             PyObject *b = (res^oparg) ? Py_True : Py_False;
-            Py_INCREF(b);
+            if (approximated) {
+                b = wrap(b, Py_None, local_adapter);
+            } else {
+                Py_INCREF(b);
+            }
             PUSH(b);
             DISPATCH();
         }

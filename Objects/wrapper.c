@@ -554,6 +554,7 @@ SLOT(tp_hash)
                                              PyErr_SetString(PyExc_TypeError, "no func");\
                                              return 0; \
                                         } \
+                                        if (adapter->func(adapter->handler_param, get_symbolic_or_none(self))) return 0;  \
                                         PyObject *concrete_result = concrete_self->ob_type->tp_as->func(concrete_self); \
                                         PyObject *symbolic = Py_None; \
                                         PyObject *symbolic_self = get_symbolic_or_none(self); \
@@ -811,14 +812,28 @@ SLOT(nb_power)
 
 static unary_handler
 get_nb_neg_handler(SymbolicAdapter *adapter, unaryfunc func) {
-    //if (func == PyLong_Type.tp_as_number->nb_negative)
-    //    return TODO;
+    if (func == PyLong_Type.tp_as_number->nb_negative)
+        return adapter->neg_long;
+    if (func == PyFloat_Type.tp_as_number->nb_negative)
+        return adapter->neg_float;
+    if (func == adapter->virtual_nb_negative)
+        return adapter->symbolic_virtual_unary_fun;
     return adapter->default_unary_handler;
 }
 UNARY_FUN_AS(nb_negative, tp_as_number, get_nb_neg_handler)
 SLOT(nb_negative)
 
-UNARY_FUN_AS(nb_positive, tp_as_number, default_unary_handler_getter)
+static unary_handler
+get_nb_pos_handler(SymbolicAdapter *adapter, unaryfunc func) {
+    if (func == PyLong_Type.tp_as_number->nb_positive)
+        return adapter->pos_long;
+    if (func == PyFloat_Type.tp_as_number->nb_positive)
+        return adapter->pos_float;
+    if (func == adapter->virtual_nb_positive)
+        return adapter->symbolic_virtual_unary_fun;
+    return adapter->default_unary_handler;
+}
+UNARY_FUN_AS(nb_positive, tp_as_number, get_nb_pos_handler)
 SLOT(nb_positive)
 
 UNARY_FUN_AS(nb_absolute, tp_as_number, default_unary_handler_getter)
