@@ -385,6 +385,9 @@ typedef struct {
     /** TODO */
     PyObject *(*approximation_builtin_sum)(PyObject *);
 
+    /** TODO */
+    int (*approximation_contains_op)(PyObject *container, PyObject *item, int *approximated);
+
     unary_handler default_unary_handler;
     binary_handler default_binary_handler;
     ternary_handler default_ternary_handler;

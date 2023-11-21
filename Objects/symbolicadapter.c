@@ -284,6 +284,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->approximation_list_slice_get_item = 0;
     result->approximation_range = 0;
     result->approximation_builtin_sum = 0;
+    result->approximation_contains_op = 0;
     result->fixate_type = default_unary_notify;
     result->default_unary_handler = default_unary;
     result->default_binary_handler = default_binary;

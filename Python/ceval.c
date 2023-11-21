@@ -4174,7 +4174,16 @@ handle_eval_breaker:
             TOUCH_STACK(0, -1);
             PyObject *right = POP();
             PyObject *left = POP();
-            int res = PySequence_Contains(right, left);
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            int res = -1, approximated = 0;
+            if (local_adapter && local_adapter->approximation_contains_op) {
+                int local_res = local_adapter->approximation_contains_op(right, left, &approximated);
+                if (approximated)
+                    res = local_res;
+            }
+            if (!approximated) {
+                res = PySequence_Contains(right, left);
+            }
             Py_DECREF(left);
             Py_DECREF(right);
             if (res < 0) {
