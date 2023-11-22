@@ -82,6 +82,12 @@ typedef struct {
     /** TODO */
     PyObject *(*create_slice)(void *, PyObject *start, PyObject *stop, PyObject *step);
 
+    /** TODO */
+    PyObject *(*create_dict)(void *, PyObject **keys, PyObject **elems);
+
+    /** TODO */
+    PyObject *(*create_dict_const_key)(void *, PyObject *keys, PyObject **elems);
+
     /** `>` operation on symbolic integers `left` and `right`. */
     PyObject *(*gt_long)(void *, PyObject *left, PyObject *right);
 

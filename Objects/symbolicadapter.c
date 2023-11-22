@@ -144,6 +144,8 @@ PyTypeObject SymbolicAdapter_Type = {
 
 static int default_instruction(void *arg, PyFrameObject *frame) { return 0; }
 static PyObject *default_create_collection(void *arg, PyObject **elems) { Py_RETURN_NONE; }
+static PyObject *default_create_dict(void *arg, PyObject **keys, PyObject **elems) { Py_RETURN_NONE; }
+static PyObject *default_create_dict_const_key(void *arg, PyObject *keys, PyObject **elems) { Py_RETURN_NONE; }
 static int default_unary_notify(void *arg, PyObject *on) { return 0; }
 static int default_binary_notify(void *arg, PyObject *first, PyObject *second) { return 0; }
 static int default_ternary_notify(void *arg, PyObject *o1, PyObject *o2, PyObject *o3) { return 0; }
@@ -188,6 +190,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->create_tuple = default_create_collection;
     result->create_range = default_ternary;
     result->create_slice = default_ternary;
+    result->create_dict = default_create_dict;
+    result->create_dict_const_key = default_create_dict_const_key;
     result->gt_long = default_binary;
     result->lt_long = default_binary;
     result->eq_long = default_binary;

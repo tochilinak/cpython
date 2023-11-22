@@ -3598,6 +3598,24 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_MAP) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = 0;
+            if (local_adapter) {
+                PyObject *keys[257];
+                PyObject *elems[257];
+                for (int i = 1; i <= oparg; i++) {
+                    PyObject *key = get_symbolic(stack_pointer[-(i*2)]);
+                    PyObject *elem = get_symbolic(stack_pointer[-(i*2 - 1)]);
+                    Py_XINCREF(key);
+                    Py_XINCREF(elem);
+                    keys[oparg - i] = key;
+                    elems[oparg - i] = elem;
+                }
+                keys[oparg] = 0;
+                elems[oparg] = 0;
+                symbolic = local_adapter->create_dict(local_adapter->handler_param, keys, elems);
+                if (!symbolic) goto error;
+            }
             TOUCH_STACK(oparg * 2, -1);
             PyObject *map = _PyDict_FromItems(
                     &PEEK(2*oparg), 2,
@@ -3605,6 +3623,9 @@ handle_eval_breaker:
                     oparg);
             if (map == NULL)
                 goto error;
+            if (symbolic) {
+                map = wrap(map, symbolic, local_adapter);
+            }
 
             while (oparg--) {
                 Py_DECREF(POP());
@@ -3671,6 +3692,21 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_CONST_KEY_MAP) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = 0;
+            if (local_adapter && PyTuple_CheckExact(TOP())) {
+                PyObject *keys = local_adapter->load_const(local_adapter->handler_param, TOP());
+                if (!keys) goto error;
+                PyObject *elems[257];
+                for (int i = 1; i <= oparg; i++) {
+                    PyObject *elem = get_symbolic(stack_pointer[-i]);
+                    Py_XINCREF(elem);
+                    elems[oparg - i] = elem;
+                }
+                elems[oparg] = 0;
+                symbolic = local_adapter->create_dict_const_key(local_adapter->handler_param, keys, elems);
+                if (!symbolic) goto error;
+            }
             TOUCH_STACK(1, -1);
             PyObject *map;
             PyObject *keys = TOP();
@@ -3685,6 +3721,9 @@ handle_eval_breaker:
                     &PEEK(oparg + 1), 1, oparg);
             if (map == NULL) {
                 goto error;
+            }
+            if (symbolic) {
+                map = wrap(map, symbolic, local_adapter);
             }
 
             Py_DECREF(POP());
