@@ -3694,12 +3694,13 @@ handle_eval_breaker:
         TARGET(BUILD_CONST_KEY_MAP) {  // REQUIRES UNWRAPPED
             set_adapter_if_symbolic_tracing_enabled(local_adapter)
             PyObject *symbolic = 0;
-            if (local_adapter && PyTuple_CheckExact(TOP())) {
-                PyObject *keys = local_adapter->load_const(local_adapter->handler_param, TOP());
-                if (!keys) goto error;
+            if (local_adapter) {
+                PyObject *keys = get_symbolic_or_none(TOP());
+                assert(keys);
+                Py_INCREF(keys);
                 PyObject *elems[257];
                 for (int i = 1; i <= oparg; i++) {
-                    PyObject *elem = get_symbolic(stack_pointer[-i]);
+                    PyObject *elem = get_symbolic(stack_pointer[-(i+1)]);
                     Py_XINCREF(elem);
                     elems[oparg - i] = elem;
                 }
@@ -3707,7 +3708,7 @@ handle_eval_breaker:
                 symbolic = local_adapter->create_dict_const_key(local_adapter->handler_param, keys, elems);
                 if (!symbolic) goto error;
             }
-            TOUCH_STACK(1, -1);
+            TOUCH_STACK(1 + oparg, -1);
             PyObject *map;
             PyObject *keys = TOP();
             if (!PyTuple_CheckExact(keys) ||
