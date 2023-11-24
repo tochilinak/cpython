@@ -389,7 +389,12 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         return 0;
     }
     PyObject *concrete_result = Py_TYPE(concrete_self)->tp_call(concrete_self, concrete_o1, o2);
-    PyObject *symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, symbolic_o1, 0);
+    PyObject *symbolic_result = Py_None;
+    if (Py_TYPE(concrete_self)->tp_call == adapter->virtual_tp_call) {
+        symbolic_result = adapter->symbolic_virtual_unary_fun(adapter->handler_param, symbolic_self);
+    } else {
+        symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, symbolic_o1, 0);
+    }
     Py_XDECREF(concrete_o1);
     Py_XDECREF(symbolic_o1);
     if (!symbolic_result) return 0;

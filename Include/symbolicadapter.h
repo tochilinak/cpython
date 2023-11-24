@@ -380,6 +380,9 @@ typedef struct {
     void *virtual_tp_iter;
 
     /** TODO */
+    void *virtual_tp_call;
+
+    /** TODO */
     void *virtual_nb_add;
 
     /** TODO */

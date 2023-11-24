@@ -285,6 +285,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->virtual_tp_richcompare = 0;
     result->virtual_tp_getattro = 0;
     result->virtual_tp_iter = 0;
+    result->virtual_tp_call = 0;
     result->virtual_nb_add = 0;
     result->virtual_nb_subtract = 0;
     result->virtual_nb_multiply = 0;
