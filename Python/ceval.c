@@ -5764,7 +5764,10 @@ handle_eval_breaker:
 
         TARGET(CALL_FUNCTION_EX) {  // REQUIRES UNWRAPPED
             PREDICTED(CALL_FUNCTION_EX);
-            TOUCH_STACK(2 + ((oparg & 0x01) != 0), -1);
+            if (oparg & 0x01) {
+                TOUCH_STACK(3, -1);
+            }
+            // else: API
             PyObject *func, *callargs, *kwargs = NULL, *result;
             if (oparg & 0x01) {
                 kwargs = POP();
