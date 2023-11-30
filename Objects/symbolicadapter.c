@@ -236,6 +236,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
+    result->call_on = default_binary_notify;
     result->nb_negative = default_unary_notify;
     result->nb_positive = default_unary_notify;
     result->nb_absolute = default_unary_notify;
@@ -364,4 +365,21 @@ register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapter) {
     Py_DECREF(consts);
 
     return 0;
+}
+
+
+PyObject *
+call_function_with_symbolic_tracing(SymbolicAdapter *adapter, PyObject *func, PyObject *args, PyObject *kwargs) {
+    assert(func && PyFunction_Check(func));
+    assert(args && PyTuple_Check(args));
+    assert(!kwargs || PyDict_Check(kwargs));
+    if (register_symbolic_tracing(func, adapter))
+        return 0;
+    if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(func)))
+        return 0;
+    PyObject *old = adapter->inside_wrapper_tp_call;
+    adapter->inside_wrapper_tp_call = PyFunction_GetCode(func);
+    PyObject *result = Py_TYPE(func)->tp_call(func, args, kwargs);
+    adapter->inside_wrapper_tp_call = old;
+    return result;
 }

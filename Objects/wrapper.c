@@ -35,23 +35,6 @@ get_symbolic_or_none(PyObject *obj) {
     return res;
 }
 
-
-static PyObject *
-call_function_with_symbolic_tracing(SymbolicAdapter *adapter, PyObject *func, PyObject *args, PyObject *kwargs) {
-    assert(func && PyFunction_Check(func));
-    assert(args && PyTuple_Check(args));
-    assert(!kwargs || PyDict_Check(kwargs));
-    if (register_symbolic_tracing(func, adapter))
-        return 0;
-    if (adapter->function_call(adapter->handler_param, PyFunction_GetCode(func)))
-        return 0;
-    PyObject *old = adapter->inside_wrapper_tp_call;
-    adapter->inside_wrapper_tp_call = PyFunction_GetCode(func);
-    PyObject *result = Py_TYPE(func)->tp_call(func, args, kwargs);
-    adapter->inside_wrapper_tp_call = old;
-    return result;
-}
-
 static void
 tp_dealloc(PyObject *op) {
     //printf("DELETING: %p\n", op);
@@ -329,7 +312,7 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
         return r;
 
     if (PyType_Check(concrete_self)) {
-        PyObject *result = adapter->approximate_type_call(adapter->handler_param, &approximated, concrete_self, o1, o2);
+        PyObject *result = adapter->approximate_type_call(adapter->handler_param, &approximated, self, o1, o2);
         if (!result)
             return 0;
         if (approximated)
@@ -372,6 +355,8 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
             PyTuple_SetItem(symbolic_o1, i, symbolic);
         }
     }
+    if (adapter->call_on(adapter->handler_param, concrete_self, symbolic_o1))
+        return 0;
     // TODO: symbolic o2
     if (o2) {
         Py_ssize_t pos = 0;

@@ -44,13 +44,16 @@ typedef struct {
     int (*none_check)(void *, PyObject *on);
 
     /** TODO */
+    int (*call_on)(void *, PyObject *func, PyObject *symbolic_args);
+
+    /** TODO */
     PyObject *(*symbolic_tp_call)(void *, PyObject *on, PyObject *args, PyObject *kwargs);
 
     /** TODO */
     PyObject *(*extract_self_from_method)(void *, PyObject *on);
 
     /** TODO */
-    PyObject *(*approximate_type_call)(void *, int *approximated, PyObject *type, PyObject *args, PyObject *kwargs);
+    PyObject *(*approximate_type_call)(void *, int *approximated, PyObject *wrapped_type, PyObject *args, PyObject *kwargs);
 
     /** TODO */
     int (*is_pycfunction_with_approximation)(void *, PyObject *symbolic_pycfunction);
@@ -440,5 +443,6 @@ PyAPI_FUNC(int) register_symbolic_tracing(PyObject *func, SymbolicAdapter *adapt
 PyAPI_FUNC(SymbolicAdapter*) create_new_adapter(void *param, PyObject *global_symbolic_clones_dict);
 PyAPI_FUNC(PyObject*) SymbolicAdapter_run(PyObject *self, PyObject *function, Py_ssize_t n, PyObject *const *args, runnable before_call, runnable after_call);
 int SymbolicAdapter_CheckExact(PyObject *obj);
+PyAPI_FUNC(PyObject*) call_function_with_symbolic_tracing(SymbolicAdapter *adapter, PyObject *func, PyObject *args, PyObject *kwargs);
 
 #endif //CPYTHON_SYMBOLICADAPTER_H
