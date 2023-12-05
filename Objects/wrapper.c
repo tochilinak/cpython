@@ -446,6 +446,8 @@ get_tp_iter_handler(SymbolicAdapter *adapter, getiterfunc func) {
         return adapter->tuple_iter;
     if (func == PyRange_Type.tp_iter)
         return adapter->range_iter;
+    if (func == PyDict_Type.tp_iter)
+        return adapter->dict_iter;
     return adapter->default_unary_handler;
 }
 

@@ -223,6 +223,9 @@ typedef struct {
     /** TODO */
     int (*dict_set_item)(void *, PyObject *self, PyObject *key, PyObject *value);
 
+    /** TODO */
+    PyObject *(*dict_iter)(void *, PyObject *self);
+
     /** Operation `iter()` on a symbolic representation of range object. */
     PyObject *(*range_iter)(void *, PyObject *range);
 

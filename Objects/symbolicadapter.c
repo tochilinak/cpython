@@ -233,6 +233,7 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->tuple_iter = default_unary;
     result->dict_get_item = default_binary;
     result->dict_set_item = default_ternary_notify;
+    result->dict_iter = default_unary;
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
     result->symbolic_isinstance = default_binary;
