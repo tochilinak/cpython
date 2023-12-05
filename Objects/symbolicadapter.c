@@ -236,6 +236,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->dict_iter = default_unary;
     result->range_iter = default_unary;
     result->range_iterator_next = default_unary;
+    result->enumerate_iter = default_unary;
+    result->enumerate_iternext = default_unary;
     result->symbolic_isinstance = default_binary;
     result->call_on = default_binary_notify;
     result->nb_negative = default_unary_notify;

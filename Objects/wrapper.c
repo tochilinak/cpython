@@ -377,7 +377,7 @@ tp_call(PyObject *self, PyObject *o1, PyObject *o2) {
     PyObject *symbolic_result = Py_None;
     if (Py_TYPE(concrete_self)->tp_call == adapter->virtual_tp_call) {
         symbolic_result = adapter->symbolic_virtual_unary_fun(adapter->handler_param, symbolic_self);
-    } else {
+    } else if (!o2) {
         symbolic_result = adapter->symbolic_tp_call(adapter->handler_param, symbolic_self, symbolic_o1, 0);
     }
     Py_XDECREF(concrete_o1);
@@ -448,6 +448,8 @@ get_tp_iter_handler(SymbolicAdapter *adapter, getiterfunc func) {
         return adapter->range_iter;
     if (func == PyDict_Type.tp_iter)
         return adapter->dict_iter;
+    if (func == PyEnum_Type.tp_iter)
+        return adapter->enumerate_iter;
     return adapter->default_unary_handler;
 }
 
@@ -485,6 +487,8 @@ get_tp_iternext_handler(SymbolicAdapter *adapter, iternextfunc func) {
         return adapter->range_iterator_next;
     if (func == PyTupleIter_Type.tp_iternext)
         return adapter->tuple_iterator_next;
+    if (func == PyEnum_Type.tp_iternext)
+        return adapter->enumerate_iternext;
     return adapter->default_unary_handler;
 }
 

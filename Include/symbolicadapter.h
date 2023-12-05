@@ -232,6 +232,12 @@ typedef struct {
     /** Operation `next()` on a symbolic range iterator (range iterator is a result of operation `iter()` on range object). */
     PyObject *(*range_iterator_next)(void *, PyObject *iterator);
 
+    /** TODO */
+    PyObject *(*enumerate_iter)(void *, PyObject *enum_obj);
+
+    /** TODO */
+    PyObject *(*enumerate_iternext)(void *, PyObject *enum_obj);
+
     /** Asks for a symbolic result of operation `isinstance`. */
     PyObject *(*symbolic_isinstance)(void *, PyObject *on, PyObject *type);
 
