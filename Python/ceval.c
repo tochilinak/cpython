@@ -3576,6 +3576,18 @@ handle_eval_breaker:
         }
 
         TARGET(BUILD_SET) {  // REQUIRES UNWRAPPED
+            set_adapter_if_symbolic_tracing_enabled(local_adapter)
+            PyObject *symbolic = 0;
+            if (local_adapter) {
+                PyObject *args[257];
+                for (int i = 1; i <= oparg; i++) {
+                    Py_XINCREF(get_symbolic(stack_pointer[-i]));
+                    args[oparg - i] = get_symbolic(stack_pointer[-i]);
+                }
+                args[oparg] = 0;
+                symbolic = local_adapter->create_set(local_adapter->handler_param, args);
+                if (!symbolic) goto error;
+            }
             TOUCH_STACK(oparg, -1);
             PyObject *set = PySet_New(NULL);
             int err = 0;
@@ -3592,6 +3604,9 @@ handle_eval_breaker:
             if (err != 0) {
                 Py_DECREF(set);
                 goto error;
+            }
+            if (symbolic) {
+                set = wrap(set, symbolic, local_adapter);
             }
             PUSH(set);
             DISPATCH();

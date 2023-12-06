@@ -91,6 +91,9 @@ typedef struct {
     /** TODO */
     PyObject *(*create_dict_const_key)(void *, PyObject *keys, PyObject **elems);
 
+    /** Asks for symbolic representation of set. */
+    PyObject *(*create_set)(void *, PyObject **elems);
+
     /** `>` operation on symbolic integers `left` and `right`. */
     PyObject *(*gt_long)(void *, PyObject *left, PyObject *right);
 
