@@ -94,6 +94,12 @@ typedef struct {
     /** Asks for symbolic representation of set. */
     PyObject *(*create_set)(void *, PyObject **elems);
 
+    /** TODO */
+    PyObject *(*str_eq)(void *, PyObject *left, PyObject *right);
+
+    /** TODO */
+    PyObject *(*str_neq)(void *, PyObject *left, PyObject *right);
+
     /** `>` operation on symbolic integers `left` and `right`. */
     PyObject *(*gt_long)(void *, PyObject *left, PyObject *right);
 

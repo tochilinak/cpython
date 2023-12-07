@@ -193,6 +193,8 @@ create_new_adapter_(PyObject *ready_wrapper_types, PyObject *global_symbolic_clo
     result->create_dict = default_create_dict;
     result->create_dict_const_key = default_create_dict_const_key;
     result->create_set = default_create_collection;
+    result->str_eq = default_binary;
+    result->str_neq = default_binary;
     result->gt_long = default_binary;
     result->lt_long = default_binary;
     result->eq_long = default_binary;

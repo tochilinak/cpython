@@ -197,6 +197,9 @@ tp_richcompare_handler_getter(SymbolicAdapter *adapter, richcmpfunc fun, int op)
         if (op == Py_NE) return adapter->ne_float;
         if (op == Py_GE) return adapter->ge_float;
         if (op == Py_LE) return adapter->le_float;
+    } else if (fun == PyUnicode_Type.tp_richcompare) {
+        if (op == Py_EQ) return adapter->str_eq;
+        if (op == Py_NE) return adapter->str_neq;
     }
     return adapter->default_binary_handler;
 }
