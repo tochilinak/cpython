@@ -1,8 +1,6 @@
 #ifndef Py_CONFIG_H
 #define Py_CONFIG_H
 
-#define _DEBUG
-
 /* pyconfig.h.  NOT Generated automatically by configure.
 
 This is a manually maintained version used for the Watcom,
