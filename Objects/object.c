@@ -18,6 +18,8 @@
 #include "pycore_unionobject.h"   // _PyUnion_Type
 #include "pycore_interpreteridobject.h"  // _PyInterpreterID_Type
 
+#include "symbolicadapter.h"
+
 #ifdef Py_LIMITED_API
    // Prevent recursive call _Py_IncRef() <=> Py_INCREF()
 #  error "Py_LIMITED_API macro must not be defined"
@@ -904,7 +906,7 @@ PyObject *
 PyObject_GetAttr(PyObject *v, PyObject *name)
 {
     PyTypeObject *tp = Py_TYPE(v);
-    if (!PyUnicode_Check(name)) {
+    if (!PyUnicode_Check(name) && !(is_wrapped(name) && is_wrapped(v) && PyUnicode_Check(unwrap(name)))) {
         PyErr_Format(PyExc_TypeError,
                      "attribute name must be string, not '%.200s'",
                      Py_TYPE(name)->tp_name);
@@ -914,18 +916,20 @@ PyObject_GetAttr(PyObject *v, PyObject *name)
     PyObject* result = NULL;
     if (tp->tp_getattro != NULL) {
         result = (*tp->tp_getattro)(v, name);
-    }
-    else if (tp->tp_getattr != NULL) {
-        const char *name_str = PyUnicode_AsUTF8(name);
-        if (name_str == NULL) {
-            return NULL;
+    } else {
+        name = unwrap(name);
+        if (tp->tp_getattr != NULL) {
+            const char *name_str = PyUnicode_AsUTF8(name);
+            if (name_str == NULL) {
+                return NULL;
+            }
+            result = (*tp->tp_getattr)(v, (char *)name_str);
         }
-        result = (*tp->tp_getattr)(v, (char *)name_str);
-    }
-    else {
-        PyErr_Format(PyExc_AttributeError,
-                    "'%.50s' object has no attribute '%U'",
-                    tp->tp_name, name);
+        else {
+            PyErr_Format(PyExc_AttributeError,
+                        "'%.50s' object has no attribute '%U'",
+                        tp->tp_name, name);
+        }
     }
 
     if (result == NULL) {
@@ -1015,7 +1019,7 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
     PyTypeObject *tp = Py_TYPE(v);
     int err;
 
-    if (!PyUnicode_Check(name)) {
+    if (!PyUnicode_Check(name) && !(is_wrapped(name) && is_wrapped(v) && PyUnicode_Check(unwrap(name)))) {
         PyErr_Format(PyExc_TypeError,
                      "attribute name must be string, not '%.200s'",
                      Py_TYPE(name)->tp_name);
@@ -1023,12 +1027,14 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
     }
     Py_INCREF(name);
 
-    PyUnicode_InternInPlace(&name);
+    if (!is_wrapped(name))
+        PyUnicode_InternInPlace(&name);
     if (tp->tp_setattro != NULL) {
         err = (*tp->tp_setattro)(v, name, value);
         Py_DECREF(name);
         return err;
     }
+    name = unwrap(name);
     if (tp->tp_setattr != NULL) {
         const char *name_str = PyUnicode_AsUTF8(name);
         if (name_str == NULL) {
@@ -1503,7 +1509,15 @@ PyObject_IsTrue(PyObject *v)
         return 0;
     if (v == Py_None)
         return 0;
-    else if (Py_TYPE(v)->tp_as_number != NULL &&
+
+    Py_INCREF(v);
+    if (is_wrapped(v)) {
+        SymbolicAdapter *adapter = get_adapter(v);
+        if (adapter->fork_notify(adapter->handler_param, get_symbolic_or_none(v)))
+            return -1;
+    }
+
+    if (Py_TYPE(v)->tp_as_number != NULL &&
              Py_TYPE(v)->tp_as_number->nb_bool != NULL)
         res = (*Py_TYPE(v)->tp_as_number->nb_bool)(v);
     else if (Py_TYPE(v)->tp_as_mapping != NULL &&
@@ -1513,7 +1527,16 @@ PyObject_IsTrue(PyObject *v)
              Py_TYPE(v)->tp_as_sequence->sq_length != NULL)
         res = (*Py_TYPE(v)->tp_as_sequence->sq_length)(v);
     else
-        return 1;
+        res = 1;
+
+    //printf("HERE (PyObject_True)! %p %ld\n", v, Py_REFCNT(v)); fflush(stdout);
+    if (is_wrapped(v) && res >= 0) {
+        SymbolicAdapter *adapter = get_adapter(v);
+        if (adapter->fork_result(adapter->handler_param, get_symbolic_or_none(v), res > 0))
+            return -1;
+    }
+    Py_DECREF(v);
+
     /* if it is negative, it should be either -1 or -2 */
     return (res > 0) ? 1 : Py_SAFE_DOWNCAST(res, Py_ssize_t, int);
 }

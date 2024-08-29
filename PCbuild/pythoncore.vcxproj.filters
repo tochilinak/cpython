@@ -231,6 +231,15 @@
     <ClInclude Include="..\Include\weakrefobject.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\Include\wrapper.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Include\symbolicadapter.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Include\approximation_defs.h">
+      <Filter>Include</Filter>
+    </ClInclude>
     <ClInclude Include="..\Modules\_math.h">
       <Filter>Modules</Filter>
     </ClInclude>
@@ -999,6 +1008,12 @@
       <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="..\Objects\weakrefobject.c">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Objects\wrapper.c">
+      <Filter>Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Objects\symbolicadapter.c">
       <Filter>Objects</Filter>
     </ClCompile>
     <ClCompile Include="..\Parser\myreadline.c">
