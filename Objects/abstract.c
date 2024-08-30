@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <stddef.h>               // offsetof()
 
+#include "symbolicadapter.h"
 
 
 /* Shorthands to return certain errors */
@@ -1087,6 +1088,20 @@ PyNumber_Add(PyObject *v, PyObject *w)
 }
 
 static PyObject *
+approximate_sequence_repeat(ssizeargfunc repeatfunc, PyObject *seq, PyObject *n, int *approximated) {
+    if (!is_wrapped(seq) || !is_wrapped(n))
+        return 0;
+    SymbolicAdapter *adapter = get_adapter(seq);
+    PyObject *concrete_seq = unwrap(seq);
+    PyObject *concrete_n = unwrap(n);
+    if (adapter->approximation_list_repeat && PyList_Check(concrete_seq) && PyLong_Check(concrete_n)) {
+        *approximated = 1;
+        return adapter->approximation_list_repeat(seq, n);
+    }
+    return 0;
+}
+
+static PyObject *
 sequence_repeat(ssizeargfunc repeatfunc, PyObject *seq, PyObject *n)
 {
     Py_ssize_t count;
@@ -1100,6 +1115,10 @@ sequence_repeat(ssizeargfunc repeatfunc, PyObject *seq, PyObject *n)
         return type_error("can't multiply sequence by "
                           "non-int of type '%.200s'", n);
     }
+    int approximated = 0;
+    PyObject *ap_res = approximate_sequence_repeat(repeatfunc, seq, n, &approximated);
+    if (approximated)
+        return ap_res;
     PyObject *res = (*repeatfunc)(seq, count);
     assert(_Py_CheckSlotResult(seq, "*", res != NULL));
     return res;

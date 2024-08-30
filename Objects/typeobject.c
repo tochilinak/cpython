@@ -15,6 +15,8 @@
 #include "opcode.h"               // MAKE_CELL
 #include "structmember.h"         // PyMemberDef
 
+#include "approximation_defs.h"
+
 #include <ctype.h>
 
 /*[clinic input]
@@ -3829,6 +3831,13 @@ _PyType_Lookup(PyTypeObject *type, PyObject *name)
     }
 
     /* We may end up clearing live exceptions below, so make sure it's ours. */
+    if (PyErr_Occurred()) {
+        PyErr_Print();
+        printf("params: %s\n", type->tp_name);
+        PyObject_Print(name, stdout, 0);
+        fflush(stdout);
+        assert(0);
+    }
     assert(!PyErr_Occurred());
 
     res = find_name_in_mro(type, name, &error);
@@ -9215,3 +9224,6 @@ PyTypeObject PySuper_Type = {
     PyObject_GC_Del,                            /* tp_free */
     .tp_vectorcall = (vectorcallfunc)super_vectorcall,
 };
+
+void *EXPORT_OBJECT_INIT = object_init;
+void *EXPORT_SLOT_INIT = slot_tp_init;
