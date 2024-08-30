@@ -8,6 +8,8 @@
 #include "pycore_tuple.h"         // _PyTuple_FromArray()
 #include <stddef.h>
 
+#include "approximation_defs.h"
+
 /*[clinic input]
 class list "PyListObject *" "&PyList_Type"
 [clinic start generated code]*/
