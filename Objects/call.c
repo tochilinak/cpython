@@ -238,6 +238,9 @@ _PyVectorcall_Call(PyThreadState *tstate, vectorcallfunc func,
 {
     assert(func != NULL);
 
+    printf("Inside _PyVectorcall\n");
+    fflush(stdout);
+
     Py_ssize_t nargs = PyTuple_GET_SIZE(tuple);
 
     /* Fast path for no keywords */
@@ -390,6 +393,8 @@ _PyFunction_Vectorcall(PyObject *func, PyObject* const* stack,
     PyThreadState *tstate = _PyThreadState_GET();
     assert(nargs == 0 || stack != NULL);
     if (((PyCodeObject *)f->func_code)->co_flags & CO_OPTIMIZED) {
+	printf("Calling optimized\n");
+	fflush(stdout);
         return _PyEval_Vector(tstate, f, NULL, stack, nargs, kwnames);
     }
     else {

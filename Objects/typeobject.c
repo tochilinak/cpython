@@ -7859,6 +7859,15 @@ slot_tp_init(PyObject *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
+    printf("found __init__. Its type: %s\n", Py_TYPE(meth)->tp_name);
+    fflush(stdout);
+    if (Py_TYPE(meth) == &PyFunction_Type) {
+        printf("name type: %s\n", Py_TYPE(((PyFunctionObject*)meth)->func_name)->tp_name);
+        printf("vectorcall ref: %p %p %p\n", ((PyFunctionObject*)meth)->vectorcall, PyVectorcall_Function(meth), _PyFunction_Vectorcall);
+	//PyObject_Print(stdout, ((PyFunctionObject *) meth)->func_name, 0);
+	fflush(stdout);
+    }
+
     PyObject *res;
     if (unbound) {
         res = _PyObject_Call_Prepend(tstate, meth, self, args, kwds);

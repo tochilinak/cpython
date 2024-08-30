@@ -41,7 +41,7 @@ _PyModule_IsExtension(PyObject *obj)
 PyObject*
 PyModuleDef_Init(PyModuleDef* def)
 {
-    printf("here\n");
+    printf("initializing %s\n", def->m_name);
     fflush(stdout);
     assert(PyModuleDef_Type.tp_flags & Py_TPFLAGS_READY);
     if (def->m_base.m_index == 0) {

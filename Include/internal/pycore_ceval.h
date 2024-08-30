@@ -70,8 +70,12 @@ static inline PyObject*
 _PyEval_EvalFrame(PyThreadState *tstate, struct _PyInterpreterFrame *frame, int throwflag)
 {
     if (tstate->interp->eval_frame == NULL) {
+	printf("eval null. Calling %p\n", _PyEval_EvalFrameDefault);
+	fflush(stdout);
         return _PyEval_EvalFrameDefault(tstate, frame, throwflag);
     }
+    printf("eval non null\n");
+    fflush(stdout);
     return tstate->interp->eval_frame(tstate, frame, throwflag);
 }
 

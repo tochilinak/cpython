@@ -37,6 +37,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 
+#pragma comment(linker, "/STACK:16000000")
+
 #ifdef Py_DEBUG
    /* For debugging the interpreter: */
 #  define LLTRACE  1      /* Low-level trace feature */
@@ -1503,7 +1505,7 @@ eval_frame_handle_pending(PyThreadState *tstate)
 #define TOUCH_STACK(n, locn) \
 do { \
     if (STACK_LEVEL() >= 0 && STACK_LEVEL() <= STACK_SIZE()) { \
-        int j = 1; \
+        /*int j = 1; \
         while (!symbolic_tracing_enabled \
         && j <= STACK_LEVEL() && is_wrapped(stack_pointer[-j])) { \
             PyObject *s = stack_pointer[-j]; \
@@ -1539,7 +1541,7 @@ do { \
                     } \
                 } \
             } \
-        } \
+        } */ \
     } \
 } while (0)
 
@@ -1558,8 +1560,9 @@ do { \
             stack_pointer[-i] = wrap(s, Py_None, adapter); \
             Py_DECREF(s); \
         } \
+	printf("here!\n"); fflush(stdout); \
         if (frame->frame_obj && !frame->frame_obj->f_fast_as_locals) { \
-            /* At index 0 is the executed code */   \
+            /* At index 0 is the executed code */ \
             for (int i = 1; i < frame->f_code->co_nlocalsplus; i++) { \
                 PyObject *s = GETLOCAL(i); \
                 if (!s || is_wrapped(s) || PyCell_Check(s)) \
@@ -1567,7 +1570,7 @@ do { \
                 PyObject *obj = wrap(s, Py_None, adapter); \
                 SETLOCAL(i, obj); \
             } \
-        }\
+        } \
     } \
 } while (0)
 
@@ -1722,9 +1725,14 @@ typedef struct {
 #define KWNAMES_LEN() \
     (call_shape.kwnames == NULL ? 0 : ((int)PyTuple_GET_SIZE(call_shape.kwnames)))
 
-PyObject* _Py_HOT_FUNCTION
+PyObject* 
 _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int throwflag)
 {
+    printf("Starting frame: ");
+    PyObject_Print(frame->f_func->func_name, stdout, 0);
+    printf("\n");
+    fflush(stdout);
+
     _Py_EnsureTstateNotNULL(tstate);
     CALL_STAT_INC(pyeval_calls);
 
@@ -1805,6 +1813,7 @@ _PyEval_EvalFrameDefault(PyThreadState *tstate, _PyInterpreterFrame *frame, int 
 
 
 start_frame:
+
     if (_Py_EnterRecursiveCallTstate(tstate, "")) {
         tstate->recursion_remaining--;
         goto exit_unwind;
@@ -1866,7 +1875,7 @@ handle_eval_breaker:
 #else
     dispatch_opcode:
         //if (cframe.use_tracing) {
-        //    printf("opcode: %d\n", opcode); fflush(stdout);
+        //   printf("opcode: %d\n", opcode); fflush(stdout);
         //}
         switch (opcode) {
 #endif
@@ -6944,11 +6953,15 @@ _PyEval_Vector(PyThreadState *tstate, PyFunctionObject *func,
             Py_INCREF(args[i+argcount]);
         }
     }
+    printf("constructing frame\n");
+    fflush(stdout);
     _PyInterpreterFrame *frame = _PyEvalFramePushAndInit(
         tstate, func, locals, args, argcount, kwnames);
     if (frame == NULL) {
         return NULL;
     }
+    printf("about to eval\n");
+    fflush(stdout);
     PyObject *retval = _PyEval_EvalFrame(tstate, frame, 0);
     assert(
         _PyFrame_GetStackPointer(frame) == _PyFrame_Stackbase(frame) ||
